@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+
+
+
+ <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -6,103 +9,6 @@
     <title>MultiTech Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<<body>
-
-<div class="layout">
-
-<aside class="sidebar">
-
-    <div class="logo-area">
-
-        <div class="logo-m">
-            M
-        </div>
-
-        <h2>MULTITECH</h2>
-
-        <p>Gestão Inteligente para Pequenos Negócios</p>
-
-    </div>
-
-    <nav>
-
-        <a href="#">🏠 Início</a>
-
-        <a href="#">👥 Clientes</a>
-
-        <a href="#">📅 Agenda</a>
-
-        <a href="#">📢 Comunicação</a>
-
-        <a href="#">⚙ Configurações</a>
-
-    </nav>
-
-</aside>
-
-<main>
-
-        <h2>📊 Visão Geral</h2>
-
-        <div class="cards">
-
-           <div class="card">
-    <h3>Total de Clientes</h3>
-    <p id="totalClientes">0 cadastrados</p>
-</div>
-            <div class="card">
-                <h3>Relatórios</h3>
-                <p>Disponíveis</p>
-            </div>
-
-        </div>
-
-        <br>
-        <h3>Buscar Cliente</h3>
-
-<input
-    type="text"
-    id="buscarCliente"
-    placeholder="Digite para buscar..."
-    oninput="filtrarClientes()"
-/>
-
-<br><br>
-<hr class="divisor">
-        <h2>👥 Gestão de Clientes</h2>
-
-
-<input type="text" id="nomeCliente" placeholder="Nome do Cliente">
-<br><br>
-
-<input type="text" id="telefoneCliente" placeholder="Telefone">
-<br><br>
-
-<input type="email" id="emailCliente" placeholder="E-mail">
-<br><br>
-
-<button onclick="cadastrarCliente()">
-    Salvar Cliente
-</button>
-
-<hr>
-
-<section class="clientes-box">
-
-    <h2>📋 Clientes Cadastrados</h2>
-
-    <div id="listaClientes" class="lista-clientes"></div>
-        <!-- clientes vão aparecer aqui -->
-    </div>
-
-</section>
-
-    </main>
-
-    </div>
-
-    <script src="app.js"></script>
-
 <body>
 
 <div class="layout">
@@ -110,42 +16,75 @@
     <aside class="sidebar">
 
         <div class="logo-area">
-
-            <div class="logo-m">
-                M
-            </div>
-
+            <div class="logo-m">M</div>
             <h2>MULTITECH</h2>
-
             <p>Gestão Inteligente para Pequenos Negócios</p>
-
         </div>
 
         <nav>
-
             <a href="#">🏠 Início</a>
-
             <a href="#">👥 Clientes</a>
-
             <a href="#">📅 Agenda</a>
-
             <a href="#">📢 Comunicação</a>
-
             <a href="#">⚙ Configurações</a>
-
         </nav>
 
     </aside>
 
     <main>
 
-        <!-- todo o conteúdo do sistema -->
+        <h2>📊 Visão Geral</h2>
+
+        <div class="cards">
+            <div class="card">
+                <h3>Total de Clientes</h3>
+                <p id="totalClientes">0 cadastrados</p>
+            </div>
+            <div class="card">
+                <h3>Relatórios</h3>
+                <p>Disponíveis</p>
+            </div>
+        </div>
+
+        <br>
+        <h3>Buscar Cliente</h3>
+        <input
+            type="text"
+            id="buscarCliente"
+            placeholder="Digite para buscar..."
+            oninput="filtrarClientes()"
+        />
+
+        <br><br>
+        <hr class="divisor">
+
+        <h2>👥 Gestão de Clientes</h2>
+        <input type="text" id="nomeCliente" placeholder="Nome do Cliente">
+        <br><br>
+
+        <input type="text" id="telefoneCliente" placeholder="Telefone">
+        <br><br>
+
+        <input type="email" id="emailCliente" placeholder="E-mail">
+        <br><br>
+
+        <button type="button" onclick="cadastrarCliente()">
+            Salvar Cliente
+        </button>
+
+        <hr>
+
+        <section class="clientes-box">
+            <h2>📋 Clientes Cadastrados</h2>
+            <div id="listaClientes" class="lista-clientes">
+                <!-- clientes vão aparecer aqui -->
+            </div>
+        </section>
 
     </main>
 
 </div>
 
 <script src="app.js"></script>
-
 </body>
 </html>
