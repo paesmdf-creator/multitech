@@ -1,29 +1,36 @@
-// COLE AQUI A CONFIGURAÇÃO DO SEU PROJETO FIREBASE
+// Configuração do projeto Firebase - MultiTech
 const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    projectId: "SEU_PROJETO",
-    storageBucket: "SEU_PROJETO.appspot.com",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SEU_APP_ID"
+    apiKey: "AIzaSyBJLqkQXG4WbgVb3msPf3PeXqxw_noOQ5o",
+    authDomain: "multitech-b393c.firebaseapp.com",
+    projectId: "multitech-b393c",
+    storageBucket: "multitech-b393c.firebasestorage.app",
+    messagingSenderId: "867560015873",
+    appId: "1:867560015873:web:3e328ad252a968b5d89800",
+    measurementId: "G-BZ81S6KM8N"
 };
 
+// Inicialização do Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+if (typeof firebase.analytics === "function") {
+    firebase.analytics();
+}
 
 let usuarioAtual = null;
 let clienteEditando = null;
 let clientesCache = [];
 
-// Registra o Service Worker para PWA
+// Registro do Service Worker para o PWA
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(err => console.error("Erro SW:", err));
+        navigator.serviceWorker.register("./sw.js").catch((err) => {
+            console.error("Erro ao registrar Service Worker:", err);
+        });
     });
 }
 
-// Monitora estado de autenticação
+// Monitora login, status da assinatura e identidade da empresa
 auth.onAuthStateChanged(async (user) => {
     const loginOverlay = document.getElementById("loginOverlay");
     const bloqueioOverlay = document.getElementById("bloqueioOverlay");
@@ -31,88 +38,115 @@ auth.onAuthStateChanged(async (user) => {
 
     if (!user) {
         usuarioAtual = null;
-        loginOverlay.style.display = "flex";
-        bloqueioOverlay.style.display = "none";
-        appLayout.style.display = "none";
+        clienteEditando = null;
+        clientesCache = [];
+        if (loginOverlay) loginOverlay.style.display = "flex";
+        if (bloqueioOverlay) bloqueioOverlay.style.display = "none";
+        if (appLayout) appLayout.style.display = "none";
         return;
     }
 
     usuarioAtual = user;
-    loginOverlay.style.display = "none";
+    if (loginOverlay) loginOverlay.style.display = "none";
 
     try {
         const empresaRef = db.collection("empresas").doc(user.uid);
         const doc = await empresaRef.get();
 
+        let dados = {
+            nome: "MULTITECH",
+            subtitulo: "Gestão Inteligente para Pequenos Negócios",
+            status: "ativa"
+        };
+
         if (!doc.exists) {
-            // Cria perfil inicial da empresa no primeiro acesso
             await empresaRef.set({
-                nome: "MULTITECH",
-                subtitulo: "Gestão Inteligente para Pequenos Negócios",
-                status: "ativa",
+                nome: dados.nome,
+                subtitulo: dados.subtitulo,
+                status: dados.status,
                 criadoEm: firebase.firestore.FieldValue.serverTimestamp()
             });
-            aplicarIdentidade("MULTITECH", "Gestão Inteligente para Pequenos Negócios");
-            bloqueioOverlay.style.display = "none";
-            appLayout.style.display = "flex";
         } else {
-            const dados = doc.data();
-            if (dados.status && dados.status !== "ativa") {
-                bloqueioOverlay.style.display = "flex";
-                appLayout.style.display = "none";
-                return;
-            }
-            aplicarIdentidade(
-                dados.nome || "MULTITECH",
-                dados.subtitulo || "Gestão Inteligente para Pequenos Negócios"
-            );
-            bloqueioOverlay.style.display = "none";
-            appLayout.style.display = "flex";
+            dados = Object.assign(dados, doc.data());
         }
 
-        carregarClientes();
+        if (dados.status && dados.status !== "ativa") {
+            if (bloqueioOverlay) bloqueioOverlay.style.display = "flex";
+            if (appLayout) appLayout.style.display = "none";
+            return;
+        }
+
+        aplicarIdentidade(dados.nome, dados.subtitulo);
+        if (bloqueioOverlay) bloqueioOverlay.style.display = "none";
+        if (appLayout) appLayout.style.display = "flex";
+
+        await carregarClientes();
     } catch (erro) {
         console.error("Erro ao validar empresa:", erro);
-        alert("Erro ao conectar ao servidor.");
+        alert("Erro ao conectar ao banco de dados. Verifique o Firestore e suas regras.");
     }
 });
 
 async function fazerLogin() {
-    const email = document.getElementById("loginEmail").value.trim();
-    const senha = document.getElementById("loginSenha").value;
+    const emailEl = document.getElementById("loginEmail");
+    const senhaEl = document.getElementById("loginSenha");
     const erroEl = document.getElementById("loginErro");
-    erroEl.textContent = "";
+
+    const email = emailEl ? emailEl.value.trim() : "";
+    const senha = senhaEl ? senhaEl.value : "";
+
+    if (erroEl) erroEl.textContent = "";
 
     if (!email || !senha) {
-        erroEl.textContent = "Preencha e-mail e senha.";
+        if (erroEl) erroEl.textContent = "Preencha e-mail e senha.";
         return;
     }
 
     try {
         await auth.signInWithEmailAndPassword(email, senha);
     } catch (erro) {
-        erroEl.textContent = "E-mail ou senha inválidos.";
+        console.error("Erro no login:", erro);
+        if (erroEl) erroEl.textContent = "E-mail ou senha inválidos.";
     }
 }
 
-function fazerLogout() {
-    auth.signOut();
+async function fazerLogout() {
+    try {
+        await auth.signOut();
+    } catch (erro) {
+        console.error("Erro ao sair:", erro);
+    }
 }
 
 function aplicarIdentidade(nome, subtitulo) {
-    document.getElementById("nomeEmpresaSidebar").textContent = nome;
-    document.getElementById("subtituloEmpresaSidebar").textContent = subtitulo;
-    document.getElementById("logoLetra").textContent = nome.trim().charAt(0).toUpperCase() || "M";
-    document.title = `${nome} - Dashboard`;
+    const nomeLimpo = (nome || "MULTITECH").trim() || "MULTITECH";
+    const subtituloLimpo = (subtitulo || "Gestão Inteligente para Pequenos Negócios").trim();
 
-    document.getElementById("inputNomeEmpresa").value = nome;
-    document.getElementById("inputSubtituloEmpresa").value = subtitulo;
+    const nomeSidebar = document.getElementById("nomeEmpresaSidebar");
+    const subSidebar = document.getElementById("subtituloEmpresaSidebar");
+    const logoLetra = document.getElementById("logoLetra");
+    const inputNome = document.getElementById("inputNomeEmpresa");
+    const inputSub = document.getElementById("inputSubtituloEmpresa");
+
+    if (nomeSidebar) nomeSidebar.textContent = nomeLimpo;
+    if (subSidebar) subSidebar.textContent = subtituloLimpo;
+    if (logoLetra) logoLetra.textContent = nomeLimpo.charAt(0).toUpperCase() || "M";
+    document.title = `${nomeLimpo} - Dashboard`;
+
+    if (inputNome) inputNome.value = nomeLimpo;
+    if (inputSub) inputSub.value = subtituloLimpo;
 }
 
 async function salvarConfiguracoesEmpresa() {
     if (!usuarioAtual) return;
-    const nome = document.getElementById("inputNomeEmpresa").value.trim() || "MULTITECH";
-    const subtitulo = document.getElementById("inputSubtituloEmpresa").value.trim() || "Gestão Inteligente para Pequenos Negócios";
+
+    const inputNome = document.getElementById("inputNomeEmpresa");
+    const inputSub = document.getElementById("inputSubtituloEmpresa");
+
+    const nome = inputNome && inputNome.value.trim() ? inputNome.value.trim() : "MULTITECH";
+    const subtitulo = inputSub && inputSub.value.trim()
+        ? inputSub.value.trim()
+        : "Gestão Inteligente para Pequenos Negócios";
 
     try {
         await db.collection("empresas").doc(usuarioAtual.uid).set(
@@ -120,30 +154,42 @@ async function salvarConfiguracoesEmpresa() {
             { merge: true }
         );
         aplicarIdentidade(nome, subtitulo);
-        alert("Identidade da empresa atualizada!");
+        alert("Identidade da empresa salva com sucesso!");
     } catch (erro) {
-        console.error("Erro ao salvar identidade:", erro);
-        alert("Erro ao salvar configurações.");
+        console.error("Erro ao salvar configurações:", erro);
+        alert("Erro ao salvar configurações da empresa.");
     }
 }
 
 async function cadastrarCliente() {
     if (!usuarioAtual) return;
 
-    const nome = document.getElementById("nomeCliente").value.trim();
-    const telefone = document.getElementById("telefoneCliente").value.trim();
-    const email = document.getElementById("emailCliente").value.trim();
+    const nomeEl = document.getElementById("nomeCliente");
+    const telefoneEl = document.getElementById("telefoneCliente");
+    const emailEl = document.getElementById("emailCliente");
+
+    const nome = nomeEl ? nomeEl.value.trim() : "";
+    const telefone = telefoneEl ? telefoneEl.value.trim() : "";
+    const email = emailEl ? emailEl.value.trim() : "";
 
     if (!nome || !telefone || !email) {
         alert("Preencha todos os campos.");
         return;
     }
 
-    const refClientes = db.collection("empresas").doc(usuarioAtual.uid).collection("clientes");
+    const refClientes = db
+        .collection("empresas")
+        .doc(usuarioAtual.uid)
+        .collection("clientes");
 
     try {
         if (clienteEditando) {
-            await refClientes.doc(clienteEditando).update({ nome, telefone, email });
+            await refClientes.doc(clienteEditando).update({
+                nome,
+                telefone,
+                email,
+                atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
         } else {
             await refClientes.add({
                 nome,
@@ -155,11 +201,11 @@ async function cadastrarCliente() {
 
         alert("Cliente salvo com sucesso!");
         clienteEditando = null;
-        document.getElementById("nomeCliente").value = "";
-        document.getElementById("telefoneCliente").value = "";
-        document.getElementById("emailCliente").value = "";
+        if (nomeEl) nomeEl.value = "";
+        if (telefoneEl) telefoneEl.value = "";
+        if (emailEl) emailEl.value = "";
 
-        carregarClientes();
+        await carregarClientes();
     } catch (erro) {
         console.error("Erro ao salvar cliente:", erro);
         alert("Erro ao salvar cliente na nuvem.");
@@ -174,93 +220,158 @@ async function carregarClientes() {
             .collection("empresas")
             .doc(usuarioAtual.uid)
             .collection("clientes")
-            .orderBy("nome")
             .get();
 
         clientesCache = [];
-        snapshot.forEach(doc => {
+        snapshot.forEach((doc) => {
             clientesCache.push({ id: doc.id, ...doc.data() });
         });
+
+        clientesCache.sort((a, b) =>
+            (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" })
+        );
 
         const totalElement = document.getElementById("totalClientes");
         if (totalElement) {
             totalElement.textContent = `${clientesCache.length} cadastrados`;
         }
 
-        renderizarClientes(clientesCache);
+        filtrarClientes();
     } catch (erro) {
         console.error("Erro ao carregar clientes:", erro);
+        alert("Erro ao carregar a lista de clientes.");
     }
 }
 
 function renderizarClientes(listaDados) {
     const lista = document.getElementById("listaClientes");
+    if (!lista) return;
+
     lista.innerHTML = "";
 
-    listaDados.forEach(cliente => {
+    listaDados.forEach((cliente) => {
         const item = document.createElement("div");
         item.className = "cliente-item";
 
         const strong = document.createElement("strong");
-        strong.textContent = cliente.nome;
+        strong.textContent = cliente.nome || "";
 
-        const info = document.createElement("div");
-        info.innerHTML = `<br>📞 ${cliente.telefone || ""}<br>📧 ${cliente.email || ""}<br><br>`;
+        const br1 = document.createElement("br");
+        const telLinha = document.createTextNode(`📞 ${cliente.telefone || ""}`);
+        const br2 = document.createElement("br");
+        const emailLinha = document.createTextNode(`📧 ${cliente.email || ""}`);
+        const br3 = document.createElement("br");
+        const br4 = document.createElement("br");
 
         const btnEditar = document.createElement("button");
+        btnEditar.type = "button";
         btnEditar.textContent = "Editar";
-        btnEditar.onclick = () => editarCliente(cliente.id, cliente.nome, cliente.telefone, cliente.email);
+        btnEditar.addEventListener("click", () => {
+            editarCliente(cliente.id, cliente.nome || "", cliente.telefone || "", cliente.email || "");
+        });
 
         const btnExcluir = document.createElement("button");
+        btnExcluir.type = "button";
         btnExcluir.textContent = "Excluir";
         btnExcluir.style.marginLeft = "8px";
-        btnExcluir.onclick = () => excluirCliente(cliente.id);
+        btnExcluir.addEventListener("click", () => {
+            excluirCliente(cliente.id);
+        });
 
         item.appendChild(strong);
-        item.appendChild(info);
+        item.appendChild(br1);
+        item.appendChild(telLinha);
+        item.appendChild(br2);
+        item.appendChild(emailLinha);
+        item.appendChild(br3);
+        item.appendChild(br4);
         item.appendChild(btnEditar);
         item.appendChild(btnExcluir);
+
         lista.appendChild(item);
     });
 }
 
 async function excluirCliente(id) {
-    if (!usuarioAtual || !confirm("Deseja realmente excluir este cliente?")) return;
+    if (!usuarioAtual || !id) return;
+    if (!confirm("Deseja realmente excluir este cliente?")) return;
 
     try {
-        await db.collection("empresas").doc(usuarioAtual.uid).collection("clientes").doc(id).delete();
+        await db
+            .collection("empresas")
+            .doc(usuarioAtual.uid)
+            .collection("clientes")
+            .doc(id)
+            .delete();
+
+        if (clienteEditando === id) {
+            clienteEditando = null;
+            const nomeEl = document.getElementById("nomeCliente");
+            const telefoneEl = document.getElementById("telefoneCliente");
+            const emailEl = document.getElementById("emailCliente");
+            if (nomeEl) nomeEl.value = "";
+            if (telefoneEl) telefoneEl.value = "";
+            if (emailEl) emailEl.value = "";
+        }
+
         alert("Cliente excluído com sucesso!");
-        carregarClientes();
+        await carregarClientes();
     } catch (erro) {
-        console.error("Erro ao excluir:", erro);
+        console.error("Erro ao excluir cliente:", erro);
+        alert("Erro ao excluir cliente.");
     }
 }
 
 function editarCliente(id, nome, telefone, email) {
     clienteEditando = id;
-    document.getElementById("nomeCliente").value = nome;
-    document.getElementById("telefoneCliente").value = telefone;
-    document.getElementById("emailCliente").value = email;
-    document.getElementById("gestaoClientes").scrollIntoView({ behavior: "smooth" });
+    const nomeEl = document.getElementById("nomeCliente");
+    const telefoneEl = document.getElementById("telefoneCliente");
+    const emailEl = document.getElementById("emailCliente");
+
+    if (nomeEl) nomeEl.value = nome;
+    if (telefoneEl) telefoneEl.value = telefone;
+    if (emailEl) emailEl.value = email;
+
+    const secao = document.getElementById("gestaoClientes");
+    if (secao) secao.scrollIntoView({ behavior: "smooth" });
 }
 
 function filtrarClientes() {
-    const texto = document.getElementById("buscarCliente").value.toLowerCase();
-    const filtrados = clientesCache.filter(c =>
+    const buscaEl = document.getElementById("buscarCliente");
+    const texto = buscaEl ? buscaEl.value.toLowerCase().trim() : "";
+
+    if (!texto) {
+        renderizarClientes(clientesCache);
+        return;
+    }
+
+    const filtrados = clientesCache.filter((c) =>
         (c.nome || "").toLowerCase().includes(texto) ||
         (c.telefone || "").toLowerCase().includes(texto) ||
         (c.email || "").toLowerCase().includes(texto)
     );
+
     renderizarClientes(filtrados);
 }
 
 function exportarClientesJSON() {
-    const blob = new Blob([JSON.stringify(clientesCache, null, 2)], { type: "application/json" });
+    const dadosExportacao = clientesCache.map(({ id, nome, telefone, email }) => ({
+        id,
+        nome: nome || "",
+        telefone: telefone || "",
+        email: email || ""
+    }));
+
+    const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], {
+        type: "application/json"
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "clientes-backup.json";
-    a.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "clientes-backup.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
 }
 
