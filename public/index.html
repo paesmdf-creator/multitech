@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MULTITECH - Dashboard</title>
+    <title>MULTITECH - Sistema de Gestão</title>
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#5c3a21">
     <link rel="stylesheet" href="./style.css">
@@ -62,7 +62,10 @@
             <nav class="menu-nav">
                 <button type="button" class="nav-btn" onclick="mostrarSecao('dashboardSecao')">📊 Dashboard</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('planilhaOrcamentaria')">📋 Planilha Orçamentária</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('planosServicos')">📦 Planos (Básico / Standard / Premium)</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('gestaoClientes')">👥 Clientes</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('portfolioDigital')">🖼 Portfólio & Galeria</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('vouchersFidelidade')">🎟 Vouchers Fidelidade</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('configEmpresa')">⚙ Configurações</button>
             </nav>
 
@@ -75,11 +78,13 @@
                 <div class="cabecalho-secao">
                     <div>
                         <h1>Dashboard Operacional</h1>
-                        <p class="descricao-secao">Visão geral dos clientes, planilhas orçamentárias e assinatura</p>
+                        <p class="descricao-secao">Visão geral de clientes, orçamentos, planos, portfólio, vouchers e ciclo de 30 dias</p>
                     </div>
                     <div class="acoes-rapidas">
                         <button type="button" class="btn-primario" onclick="prepararNovoOrcamento()">+ Novo Orçamento</button>
-                        <button type="button" class="btn-secundario" onclick="mostrarSecao('gestaoClientes')">+ Novo Cliente</button>
+                        <button type="button" class="btn-secundario" onclick="mostrarSecao('planosServicos')">Planos</button>
+                        <button type="button" class="btn-secundario" onclick="mostrarSecao('portfolioDigital')">Portfólio</button>
+                        <button type="button" class="btn-secundario" onclick="mostrarSecao('vouchersFidelidade')">Vouchers</button>
                     </div>
                 </div>
 
@@ -97,15 +102,21 @@
                     </div>
 
                     <div class="kpi-card">
-                        <span class="kpi-label">Valor Total em Orçamentos</span>
+                        <span class="kpi-label">Valor em Orçamentos</span>
                         <strong class="kpi-valor" id="kpiValorTotalOrcamentos">R$ 0,00</strong>
                         <small class="kpi-sub" id="kpiValorAprovado">Aprovado: R$ 0,00</small>
                     </div>
 
                     <div class="kpi-card">
+                        <span class="kpi-label">Planos / Portfólio / Vouchers</span>
+                        <strong class="kpi-valor" id="kpiResumoModulos">0 / 0 / 0</strong>
+                        <small class="kpi-sub">Planos • Fotos • Vouchers</small>
+                    </div>
+
+                    <div class="kpi-card">
                         <span class="kpi-label">Ciclo / Assinatura</span>
-                        <strong class="kpi-valor" id="kpiCicloDias">30 dias</strong>
-                        <small class="kpi-sub" id="kpiDetalheCiclo">Verificando prazo...</small>
+                        <strong class="kpi-valor" id="kpiCicloDias">30d rest.</strong>
+                        <small class="kpi-sub" id="kpiDetalheCiclo">0 de 30 dias corridos</small>
                     </div>
                 </div>
 
@@ -131,15 +142,15 @@
                 <div class="cabecalho-secao">
                     <div>
                         <h2>Planilha Orçamentária</h2>
-                        <p class="descricao-secao">Monte orçamentos por item, calcule o total automaticamente e acompanhe o status</p>
+                        <p class="descricao-secao">Defina valores conforme os serviços/planos escolhidos pelo cliente e calcule o total na hora</p>
                     </div>
                     <button type="button" class="btn-secundario" onclick="exportarOrcamentosJSON()">📥 Exportar Orçamentos JSON</button>
                 </div>
 
                 <div class="form-orcamento-topo">
                     <div class="campo-grupo">
-                        <label for="orcTitulo">Título / Obra ou Serviço</label>
-                        <input type="text" id="orcTitulo" placeholder="Ex.: Reforma de cozinha / Pacote mensal">
+                        <label for="orcTitulo">Título / Demanda do Cliente</label>
+                        <input type="text" id="orcTitulo" placeholder="Ex.: Pacote Standard + Divulgação">
                     </div>
 
                     <div class="campo-grupo">
@@ -158,24 +169,29 @@
                     </div>
 
                     <div class="campo-grupo">
-                        <label for="orcDesconto">Desconto (R$)</label>
+                        <label for="orcDesconto">Desconto / Voucher (R$)</label>
                         <input type="number" id="orcDesconto" step="0.01" min="0" value="0" oninput="recalcularTotaisPlanilha()">
                     </div>
                 </div>
 
-                <div class="planilha-controles-itens">
-                    <button type="button" class="btn-secundario" onclick="adicionarLinhaItem()">+ Adicionar Item na Planilha</button>
-                    <button type="button" class="btn-limpar" onclick="limparFormularioOrcamento()">Limpar Formulário</button>
+                <div class="barra-aplicar-plano">
+                    <div class="campo-grupo campo-flex">
+                        <label for="selectPlanoRapido">Adicionar Serviço ou Plano Escolhido (Básico / Standard / Premium)</label>
+                        <select id="selectPlanoRapido"></select>
+                    </div>
+                    <button type="button" class="btn-secundario" onclick="inserirPlanoNaPlanilha()">+ Inserir na Planilha</button>
+                    <button type="button" class="btn-secundario" onclick="adicionarLinhaItem()">+ Linha Avulsa</button>
+                    <button type="button" class="btn-limpar" onclick="limparFormularioOrcamento()">Limpar</button>
                 </div>
 
                 <div class="tabela-responsiva">
                     <table class="tabela-planilha">
                         <thead>
                             <tr>
-                                <th>Descrição do Item / Serviço</th>
+                                <th>Descrição do Serviço / Item</th>
                                 <th class="col-curta">Unid.</th>
                                 <th class="col-numero">Qtd.</th>
-                                <th class="col-numero">Valor Unit. (R$)</th>
+                                <th class="col-numero">Valor Escolhido (R$)</th>
                                 <th class="col-numero">Subtotal (R$)</th>
                                 <th class="col-acao">Ação</th>
                             </tr>
@@ -186,7 +202,7 @@
 
                 <div class="rodape-planilha">
                     <div class="totais-planilha">
-                        <div>Subtotal dos itens: <strong id="planilhaSubtotal">R$ 0,00</strong></div>
+                        <div>Subtotal dos serviços/itens: <strong id="planilhaSubtotal">R$ 0,00</strong></div>
                         <div>Desconto: <strong id="planilhaDesconto">R$ 0,00</strong></div>
                         <div class="total-destaque">Total Geral: <strong id="planilhaTotalGeral">R$ 0,00</strong></div>
                     </div>
@@ -208,6 +224,40 @@
                 </div>
 
                 <div id="listaOrcamentos" class="lista-cards"></div>
+            </section>
+
+            <!-- PLANOS DE SERVIÇOS OFERECIDOS -->
+            <section id="planosServicos" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Planos de Serviços (Básico, Standard e Premium)</h2>
+                        <p class="descricao-secao">Cadastre e ajuste os valores dos planos escolhidos pelos clientes e envie direto para o orçamento</p>
+                    </div>
+                    <button type="button" class="btn-secundario" onclick="restaurarPlanosPadrao()">Restaurar Base Básico/Standard/Premium</button>
+                </div>
+
+                <div class="grid-form-plano">
+                    <input type="text" id="planoNome" placeholder="Nome do plano (ex.: Plano Standard)">
+                    <select id="planoNivel">
+                        <option value="Básico">Nível Básico</option>
+                        <option value="Standard">Nível Standard</option>
+                        <option value="Premium">Nível Premium</option>
+                        <option value="Personalizado">Serviço / Personalizado</option>
+                    </select>
+                    <input type="number" id="planoValor" step="0.01" min="0" placeholder="Valor (R$)">
+                    <input type="text" id="planoPeriodicidade" placeholder="Periodicidade (ex.: Mensal, Projeto)">
+                    <input type="text" id="planoDescricao" class="span-2" placeholder="O que está incluído neste nível de serviço">
+                    <button type="button" class="btn-primario" id="btnSalvarPlano" onclick="salvarPlano()">Salvar Plano</button>
+                </div>
+
+                <hr class="divisor">
+
+                <div class="cabecalho-lista">
+                    <h3>Planos Cadastrados</h3>
+                    <span id="totalPlanosBadge" class="badge-contagem">0 planos</span>
+                </div>
+
+                <div id="listaPlanos" class="lista-cards"></div>
             </section>
 
             <!-- GESTÃO DE CLIENTES -->
@@ -239,6 +289,70 @@
                 </div>
 
                 <div id="listaClientes" class="lista-cards"></div>
+            </section>
+
+            <!-- PORTFÓLIO DIGITAL E GALERIA DE FOTOS -->
+            <section id="portfolioDigital" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Portfólio Digital & Galeria de Fotos</h2>
+                        <p class="descricao-secao">Monte sua vitrine de serviços realizados e copie textos prontos para divulgar nas redes sociais</p>
+                    </div>
+                </div>
+
+                <div class="grid-form-portfolio">
+                    <input type="text" id="portTitulo" placeholder="Título do trabalho (ex.: Identidade & Gestão Standard)">
+                    <select id="portCategoria">
+                        <option value="Básico">Básico</option>
+                        <option value="Standard">Standard</option>
+                        <option value="Premium">Premium</option>
+                        <option value="Prestação de Serviço">Prestação de Serviço</option>
+                    </select>
+                    <input type="text" id="portImagemUrl" placeholder="URL da foto (opcional) ou envie arquivo abaixo">
+                    <input type="file" id="portImagemArquivo" accept="image/*">
+                    <input type="text" id="portDescricao" class="span-2" placeholder="Descrição do serviço realizado para divulgação">
+                    <button type="button" class="btn-primario" id="btnSalvarPortfolio" onclick="salvarItemPortfolio()">Publicar no Portfólio</button>
+                </div>
+
+                <hr class="divisor">
+
+                <div class="cabecalho-lista">
+                    <h3>Galeria do Portfólio</h3>
+                    <span id="totalPortfolioBadge" class="badge-contagem">0 itens</span>
+                </div>
+
+                <div id="listaPortfolio" class="lista-cards"></div>
+            </section>
+
+            <!-- VOUCHERS POR FIDELIDADE -->
+            <section id="vouchersFidelidade" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Vouchers por Fidelidade</h2>
+                        <p class="descricao-secao">Crie cupons/vouchers de fidelidade para clientes recorrentes e aplique descontos nos orçamentos</p>
+                    </div>
+                </div>
+
+                <div class="grid-form-voucher">
+                    <input type="text" id="voucherCodigo" placeholder="Código (ex.: FIDEL10)">
+                    <select id="voucherTipo">
+                        <option value="percentual">Desconto em % (ex.: 10%)</option>
+                        <option value="valor_fixo">Valor Fixo em R$ (ex.: R$ 50)</option>
+                    </select>
+                    <input type="number" id="voucherValor" step="0.01" min="0" placeholder="Valor ou % de desconto">
+                    <input type="text" id="voucherCliente" list="sugestoesClientes" placeholder="Cliente fidelizado (opcional)">
+                    <input type="text" id="voucherDescricao" placeholder="Motivo / regra de fidelidade">
+                    <button type="button" class="btn-primario" onclick="salvarVoucher()">Criar Voucher</button>
+                </div>
+
+                <hr class="divisor">
+
+                <div class="cabecalho-lista">
+                    <h3>Vouchers Cadastrados</h3>
+                    <span id="totalVouchersBadge" class="badge-contagem">0 vouchers</span>
+                </div>
+
+                <div id="listaVouchers" class="lista-cards"></div>
             </section>
 
             <!-- CONFIGURAÇÕES DA EMPRESA -->
