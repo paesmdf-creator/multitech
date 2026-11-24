@@ -1,90 +1,129 @@
-
-
-
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#8c5a37">
     <title>MultiTech Dashboard</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="layout">
+<!-- TELA DE LOGIN (Exibida quando não autenticado) -->
+<div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+        <div class="logo-m">M</div>
+        <h2>MULTITECH</h2>
+        <p>Acesso ao Sistema de Gestão</p>
+        <input type="email" id="loginEmail" placeholder="E-mail de acesso">
+        <input type="password" id="loginSenha" placeholder="Senha">
+        <button type="button" onclick="fazerLogin()">Entrar no Sistema</button>
+        <p id="loginErro" class="erro-texto"></p>
+    </div>
+</div>
+
+<!-- TELA DE ASSINATURA BLOQUEADA -->
+<div id="bloqueioOverlay" class="login-overlay" style="display: none;">
+    <div class="login-card">
+        <div class="logo-m">!</div>
+        <h2>Assinatura Pendente</h2>
+        <p>Sua mensalidade está pendente ou o acesso foi pausado. Entre em contato com o suporte para regularizar.</p>
+        <button type="button" onclick="fazerLogout()">Sair</button>
+    </div>
+</div>
+
+<!-- LAYOUT PRINCIPAL -->
+<div class="layout" id="appLayout" style="display: none;">
 
     <aside class="sidebar">
 
         <div class="logo-area">
-            <div class="logo-m">M</div>
-            <h2>MULTITECH</h2>
-            <p>Gestão Inteligente para Pequenos Negócios</p>
+            <div class="logo-m" id="logoLetra">M</div>
+            <h2 id="nomeEmpresaSidebar">MULTITECH</h2>
+            <p id="subtituloEmpresaSidebar">Gestão Inteligente para Pequenos Negócios</p>
         </div>
 
         <nav>
-            <a href="#">🏠 Início</a>
-            <a href="#">👥 Clientes</a>
-            <a href="#">📅 Agenda</a>
-            <a href="#">📢 Comunicação</a>
-            <a href="#">⚙ Configurações</a>
+            <a href="#visaoGeral" onclick="mostrarSecao('visaoGeral')">🏠 Início</a>
+            <a href="#gestaoClientes" onclick="mostrarSecao('gestaoClientes')">👥 Clientes</a>
+            <a href="#configuracoes" onclick="mostrarSecao('configuracoes')">⚙ Configurações</a>
+            <a href="#" onclick="fazerLogout()">🚪 Sair</a>
         </nav>
 
     </aside>
 
     <main>
 
-        <h2>📊 Visão Geral</h2>
+        <section id="visaoGeral">
+            <h2>📊 Visão Geral</h2>
 
-        <div class="cards">
-            <div class="card">
-                <h3>Total de Clientes</h3>
-                <p id="totalClientes">0 cadastrados</p>
+            <div class="cards">
+                <div class="card">
+                    <h3>Total de Clientes</h3>
+                    <p id="totalClientes">0 cadastrados</p>
+                </div>
+                <div class="card">
+                    <h3>Backup</h3>
+                    <button type="button" onclick="exportarClientesJSON()">📥 Exportar JSON</button>
+                </div>
             </div>
-            <div class="card">
-                <h3>Relatórios</h3>
-                <p>Disponíveis</p>
-            </div>
-        </div>
 
-        <br>
-        <h3>Buscar Cliente</h3>
-        <input
-            type="text"
-            id="buscarCliente"
-            placeholder="Digite para buscar..."
-            oninput="filtrarClientes()"
-        />
+            <br>
+            <h3>Buscar Cliente</h3>
+            <input
+                type="text"
+                id="buscarCliente"
+                placeholder="Digite para buscar..."
+                oninput="filtrarClientes()"
+            />
+        </section>
 
-        <br><br>
         <hr class="divisor">
 
-        <h2>👥 Gestão de Clientes</h2>
-        <input type="text" id="nomeCliente" placeholder="Nome do Cliente">
-        <br><br>
+        <section id="gestaoClientes">
+            <h2>👥 Gestão de Clientes</h2>
+            <input type="text" id="nomeCliente" placeholder="Nome do Cliente">
+            <br><br>
 
-        <input type="text" id="telefoneCliente" placeholder="Telefone">
-        <br><br>
+            <input type="text" id="telefoneCliente" placeholder="Telefone">
+            <br><br>
 
-        <input type="email" id="emailCliente" placeholder="E-mail">
-        <br><br>
+            <input type="email" id="emailCliente" placeholder="E-mail">
+            <br><br>
 
-        <button type="button" onclick="cadastrarCliente()">
-            Salvar Cliente
-        </button>
+            <button type="button" onclick="cadastrarCliente()">
+                Salvar Cliente
+            </button>
 
-        <hr>
+            <hr>
 
-        <section class="clientes-box">
-            <h2>📋 Clientes Cadastrados</h2>
-            <div id="listaClientes" class="lista-clientes">
-                <!-- clientes vão aparecer aqui -->
-            </div>
+            <section class="clientes-box">
+                <h2>📋 Clientes Cadastrados</h2>
+                <div id="listaClientes" class="lista-clientes">
+                    <!-- clientes vão aparecer aqui -->
+                </div>
+            </section>
+        </section>
+
+        <hr class="divisor">
+
+        <section id="configuracoes" class="clientes-box">
+            <h2>⚙ Configurações da Empresa</h2>
+            <p>Personalize o nome exibido no sistema para o seu negócio:</p>
+            <input type="text" id="inputNomeEmpresa" placeholder="Nome do seu comércio (ex: Barbearia Silva)">
+            <input type="text" id="inputSubtituloEmpresa" placeholder="Subtítulo ou slogan">
+            <button type="button" onclick="salvarConfiguracoesEmpresa()">Salvar Identidade</button>
         </section>
 
     </main>
 
 </div>
 
+<!-- Firebase SDKs (Compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
