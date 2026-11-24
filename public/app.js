@@ -493,6 +493,32 @@ function copiarLinkAgendamento() {
     alert(`Link de agendamento copiado:\n${link}`);
 }
 
+function normalizarTelefoneWhatsApp(telefone) {
+    const digitos = String(telefone || "").replace(/\D/g, "");
+    if (!digitos) return "";
+    return digitos.startsWith("55") ? digitos : `55${digitos}`;
+}
+
+function abrirWhatsAppAgendamento(ag) {
+    const numero = normalizarTelefoneWhatsApp(ag.clienteTelefone);
+    if (!numero) {
+        alert("Telefone do cliente não informado ou inválido.");
+        return;
+    }
+
+    const empresaNome = document.getElementById("nomeEmpresaSidebar")?.textContent?.trim() || "MULTITECH";
+    let mensagem = `Olá ${ag.clienteNome || "cliente"}, sobre seu agendamento de ${ag.servico || "serviço"} em ${ag.data || ""} às ${ag.hora || ""} (${empresaNome}).`;
+
+    if (ag.status === "Confirmado") {
+        mensagem = `Olá ${ag.clienteNome || "cliente"}! Seu agendamento de ${ag.servico || "serviço"} para ${ag.data || ""} às ${ag.hora || ""} está CONFIRMADO na ${empresaNome}.`;
+    } else if (ag.status === "Recusado") {
+        mensagem = `Olá ${ag.clienteNome || "cliente"}. Não conseguimos atender no horário de ${ag.data || ""} às ${ag.hora || ""} (${ag.servico || "serviço"}). Podemos combinar outro horário? (${empresaNome})`;
+    }
+
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+}
+
 async function salvarAgendamentoManual() {
     if (!usuarioAtual) return;
 
@@ -570,7 +596,14 @@ function renderizarAgendamentos() {
     agendamentosCache.forEach((ag) => {
         const card = document.createElement("div");
         card.className = "modulo-card";
-        const classeStatus = ag.status === "Concluído" ? "status-aprovado" : ag.status === "Confirmado" ? "status-enviado" : "";
+        const classeStatus =
+            ag.status === "Concluído"
+                ? "status-aprovado"
+                : ag.status === "Confirmado"
+                ? "status-enviado"
+                : ag.status === "Recusado"
+                ? "status-recusado"
+                : "";
 
         card.innerHTML = `
             <div class="card-topo">
@@ -598,6 +631,44 @@ function renderizarAgendamentos() {
             atualizarStatusNuvem("sincronizado");
         });
 
+        const btnHorario = document.createElement("button");
+        btnHorario.type = "button";
+        btnHorario.className = "btn-secundario";
+        btnHorario.textContent = "Horário";
+        btnHorario.addEventListener("click", async () => {
+            const novaData = prompt("Nova data (AAAA-MM-DD):", ag.data || "");
+            if (novaData === null) return;
+            const novoHora = prompt("Novo horário (HH:MM):", ag.hora || "");
+            if (novoHora === null) return;
+            atualizarStatusNuvem("sincronizando");
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("agendamentos").doc(ag.id).update({
+                data: novaData.trim() || ag.data,
+                hora: novoHora.trim() || ag.hora,
+                status: "Confirmado"
+            });
+            await carregarAgendamentos();
+            atualizarAssistentePremium();
+            atualizarStatusNuvem("sincronizado");
+        });
+
+        const btnRecusar = document.createElement("button");
+        btnRecusar.type = "button";
+        btnRecusar.className = "btn-remover-linha";
+        btnRecusar.textContent = "Recusar";
+        btnRecusar.addEventListener("click", async () => {
+            atualizarStatusNuvem("sincronizando");
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("agendamentos").doc(ag.id).update({ status: "Recusado" });
+            await carregarAgendamentos();
+            atualizarAssistentePremium();
+            atualizarStatusNuvem("sincronizado");
+        });
+
+        const btnWhatsApp = document.createElement("button");
+        btnWhatsApp.type = "button";
+        btnWhatsApp.className = "btn-primario";
+        btnWhatsApp.textContent = "WhatsApp";
+        btnWhatsApp.addEventListener("click", () => abrirWhatsAppAgendamento(ag));
+
         const btnExcluir = document.createElement("button");
         btnExcluir.type = "button";
         btnExcluir.className = "btn-remover-linha";
@@ -612,6 +683,9 @@ function renderizarAgendamentos() {
         });
 
         acoes.appendChild(btnStatus);
+        acoes.appendChild(btnHorario);
+        acoes.appendChild(btnRecusar);
+        acoes.appendChild(btnWhatsApp);
         acoes.appendChild(btnExcluir);
         card.appendChild(acoes);
         lista.appendChild(card);
