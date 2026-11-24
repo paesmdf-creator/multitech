@@ -25,7 +25,7 @@ body {
     line-height: 1.45;
 }
 
-/* Overlays de Login e Bloqueio */
+/* Overlays de Login, Bloqueio e Agendamento Público */
 .overlay {
     position: fixed;
     inset: 0;
@@ -46,6 +46,22 @@ body {
     padding: 28px 24px;
     text-align: center;
     box-shadow: 0 12px 30px rgba(43, 29, 18, 0.2);
+}
+
+.agendamento-publico-card {
+    max-width: 440px;
+}
+
+.form-publico {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.grid-duas-colunas-compacta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
 }
 
 .login-logo {
@@ -79,6 +95,13 @@ body {
     color: var(--erro);
     font-size: 13px;
     margin-top: 10px;
+    min-height: 18px;
+}
+
+.mensagem-sucesso {
+    color: var(--destaque-sucesso);
+    font-size: 13px;
+    font-weight: bold;
     min-height: 18px;
 }
 
@@ -234,6 +257,15 @@ body {
     flex-wrap: wrap;
 }
 
+.aviso-plano {
+    background: #fbe8d2;
+    border: 1px solid #e2ba8c;
+    color: var(--marrom-escuro);
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
 /* KPIs Dashboard */
 .grid-kpis {
     display: grid;
@@ -369,6 +401,7 @@ button {
 
 /* Formulários e Grades */
 .form-orcamento-topo,
+.grid-form-agenda,
 .grid-form-cliente,
 .grid-form-plano,
 .grid-form-portfolio,
