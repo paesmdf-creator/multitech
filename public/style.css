@@ -89,14 +89,14 @@ body {
 }
 
 .sidebar {
-    width: 265px;
+    width: 270px;
     flex-shrink: 0;
     background: var(--marrom-escuro);
     color: #fff8f0;
     padding: 20px 16px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
 }
 
 .marca-sidebar {
@@ -141,7 +141,7 @@ body {
 .menu-nav {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
     flex: 1;
 }
 
@@ -154,7 +154,7 @@ body {
     padding: 10px 12px;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .nav-btn:hover {
@@ -177,7 +177,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 22px;
-    max-width: 1200px;
+    max-width: 1220px;
     width: 100%;
     margin: 0 auto;
 }
@@ -208,15 +208,15 @@ body {
 
 .acoes-rapidas {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 /* KPIs Dashboard */
 .grid-kpis {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+    gap: 12px;
     margin-bottom: 18px;
 }
 
@@ -224,21 +224,21 @@ body {
     background: #faf4eb;
     border: 1px solid var(--borda-suave);
     border-radius: 12px;
-    padding: 16px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .kpi-label {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--texto-secundario);
     font-weight: bold;
     text-transform: uppercase;
 }
 
 .kpi-valor {
-    font-size: 22px;
+    font-size: 21px;
     color: var(--marrom-escuro);
 }
 
@@ -301,11 +301,11 @@ input:focus, select:focus {
 }
 
 button {
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     border-radius: 8px;
     border: none;
-    padding: 10px 15px;
+    padding: 10px 14px;
     font-weight: bold;
 }
 
@@ -345,12 +345,41 @@ button {
     margin-top: 4px;
 }
 
-/* Planilha Orçamentária */
-.form-orcamento-topo {
+/* Formulários e Grades */
+.form-orcamento-topo,
+.grid-form-cliente,
+.grid-form-plano,
+.grid-form-portfolio,
+.grid-form-voucher,
+.grid-config {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 12px;
+}
+
+.form-orcamento-topo {
+    margin-bottom: 12px;
+}
+
+.barra-aplicar-plano {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
     margin-bottom: 14px;
+    background: #faf4eb;
+    border: 1px solid var(--borda-suave);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.campo-flex {
+    flex: 1;
+    min-width: 240px;
+}
+
+.span-2 {
+    grid-column: span 2;
 }
 
 .campo-grupo {
@@ -363,13 +392,6 @@ button {
     font-size: 12px;
     font-weight: bold;
     color: var(--texto-secundario);
-}
-
-.planilha-controles-itens {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
 }
 
 .tabela-responsiva {
@@ -400,8 +422,8 @@ button {
 }
 
 .col-curta { width: 85px; }
-.col-numero { width: 130px; }
-.col-acao { width: 85px; }
+.col-numero { width: 135px; }
+.col-acao { width: 90px; }
 
 .subtotal-celula {
     font-weight: bold;
@@ -475,20 +497,23 @@ button {
 }
 
 .cliente-item,
-.orcamento-card {
+.orcamento-card,
+.modulo-card {
     background: #faf4eb;
     border: 1px solid var(--borda-suave);
     border-radius: 10px;
     padding: 14px;
     font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.orcamento-topo-card {
+.card-topo {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
-    margin-bottom: 6px;
 }
 
 .status-pill {
@@ -498,9 +523,11 @@ button {
     border-radius: 999px;
     background: #e7decb;
     color: var(--marrom-escuro);
+    white-space: nowrap;
 }
 
-.status-aprovado {
+.status-aprovado,
+.status-disponivel {
     background: #dff2e6;
     color: var(--destaque-sucesso);
 }
@@ -510,11 +537,25 @@ button {
     color: var(--destaque-alerta);
 }
 
-.grid-form-cliente,
-.grid-config {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 12px;
+.status-resgatado {
+    background: #e6e6e6;
+    color: #555;
+}
+
+.foto-portfolio {
+    width: 100%;
+    height: 155px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--borda-suave);
+    background: #efe5d8;
+}
+
+.acoes-card {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
 }
 
 .texto-vazio {
@@ -533,5 +574,9 @@ button {
 
     .conteudo-principal {
         padding: 14px;
+    }
+
+    .span-2 {
+        grid-column: span 1;
     }
 }
