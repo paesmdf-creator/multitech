@@ -17,6 +17,9 @@ if (typeof firebase.analytics === "function") {
     firebase.analytics();
 }
 
+const PRAZO_DIAS_ASSINATURA = 30;
+const MS_POR_DIA = 1000 * 60 * 60 * 24;
+
 let usuarioAtual = null;
 let clienteEditando = null;
 let clientesCache = [];
@@ -30,7 +33,25 @@ if ("serviceWorker" in navigator) {
     });
 }
 
-// Monitora login, status da assinatura e identidade da empresa
+function calcularDiasCorridos(criadoEm) {
+    if (!criadoEm) return 0;
+
+    let dataInicio = null;
+    if (typeof criadoEm.toDate === "function") {
+        dataInicio = criadoEm.toDate();
+    } else if (criadoEm instanceof Date) {
+        dataInicio = criadoEm;
+    } else {
+        dataInicio = new Date(criadoEm);
+    }
+
+    if (isNaN(dataInicio.getTime())) return 0;
+
+    const diferencaMs = Date.now() - dataInicio.getTime();
+    return Math.floor(diferencaMs / MS_POR_DIA);
+}
+
+// Monitora login, prazo de 30 dias corridos, status da assinatura e identidade da empresa
 auth.onAuthStateChanged(async (user) => {
     const loginOverlay = document.getElementById("loginOverlay");
     const bloqueioOverlay = document.getElementById("bloqueioOverlay");
@@ -56,7 +77,8 @@ auth.onAuthStateChanged(async (user) => {
         let dados = {
             nome: "MULTITECH",
             subtitulo: "Gestão Inteligente para Pequenos Negócios",
-            status: "ativa"
+            status: "ativa",
+            pagamentoConfirmado: false
         };
 
         if (!doc.exists) {
@@ -64,13 +86,40 @@ auth.onAuthStateChanged(async (user) => {
                 nome: dados.nome,
                 subtitulo: dados.subtitulo,
                 status: dados.status,
+                pagamentoConfirmado: false,
                 criadoEm: firebase.firestore.FieldValue.serverTimestamp()
             });
         } else {
             dados = Object.assign(dados, doc.data());
+
+            // Se ainda não tem criadoEm (ex.: conta criada antes dessa regra), define agora
+            if (!dados.criadoEm) {
+                await empresaRef.set(
+                    { criadoEm: firebase.firestore.FieldValue.serverTimestamp() },
+                    { merge: true }
+                );
+                dados.criadoEm = new Date();
+            }
+
+            const diasCorridos = calcularDiasCorridos(dados.criadoEm);
+            const venceuPrazo30Dias =
+                diasCorridos > PRAZO_DIAS_ASSINATURA &&
+                dados.pagamentoConfirmado !== true &&
+                dados.status !== "vitalicio";
+
+            if (venceuPrazo30Dias && dados.status !== "bloqueada") {
+                dados.status = "bloqueada";
+                await empresaRef.set(
+                    {
+                        status: "bloqueada",
+                        bloqueadoEm: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    { merge: true }
+                );
+            }
         }
 
-        if (dados.status && dados.status !== "ativa") {
+        if (dados.status && dados.status !== "ativa" && dados.status !== "vitalicio") {
             if (bloqueioOverlay) bloqueioOverlay.style.display = "flex";
             if (appLayout) appLayout.style.display = "none";
             return;
