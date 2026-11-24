@@ -3,127 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#8c5a37">
-    <title>MultiTech Dashboard</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css">
+    <title>MULTITECH - Dashboard</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#5c3a21">
+    <link rel="stylesheet" href="./style.css">
+
+    <!-- Firebase Compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
 </head>
 <body>
+    <!-- Tela de Login -->
+    <div id="loginOverlay" class="overlay" style="display: none;">
+        <div class="login-card">
+            <div class="logo-box login-logo">M</div>
+            <h1>MULTITECH</h1>
+            <p class="subtitulo-login">Acesso ao Sistema de Gestão</p>
 
-<!-- TELA DE LOGIN (Exibida quando não autenticado) -->
-<div id="loginOverlay" class="login-overlay">
-    <div class="login-card">
-        <div class="logo-m">M</div>
-        <h2>MULTITECH</h2>
-        <p>Acesso ao Sistema de Gestão</p>
-        <input type="email" id="loginEmail" placeholder="E-mail de acesso">
-        <input type="password" id="loginSenha" placeholder="Senha">
-        <button type="button" onclick="fazerLogin()">Entrar no Sistema</button>
-        <p id="loginErro" class="erro-texto"></p>
-    </div>
-</div>
-
-<!-- TELA DE ASSINATURA BLOQUEADA -->
-<div id="bloqueioOverlay" class="login-overlay" style="display: none;">
-    <div class="login-card">
-        <div class="logo-m">!</div>
-        <h2>Assinatura Pendente</h2>
-        <p>Sua mensalidade está pendente ou o acesso foi pausado. Entre em contato com o suporte para regularizar.</p>
-        <button type="button" onclick="fazerLogout()">Sair</button>
-    </div>
-</div>
-
-<!-- LAYOUT PRINCIPAL -->
-<div class="layout" id="appLayout" style="display: none;">
-
-    <aside class="sidebar">
-
-        <div class="logo-area">
-            <div class="logo-m" id="logoLetra">M</div>
-            <h2 id="nomeEmpresaSidebar">MULTITECH</h2>
-            <p id="subtituloEmpresaSidebar">Gestão Inteligente para Pequenos Negócios</p>
+            <input type="email" id="loginEmail" placeholder="E-mail de acesso" autocomplete="username">
+            <input type="password" id="loginSenha" placeholder="Senha" autocomplete="current-password">
+            <button type="button" id="btnEntrar" onclick="fazerLogin()">Entrar no Sistema</button>
+            <p id="loginErro" class="mensagem-erro"></p>
         </div>
+    </div>
 
-        <nav>
-            <a href="#visaoGeral" onclick="mostrarSecao('visaoGeral')">🏠 Início</a>
-            <a href="#gestaoClientes" onclick="mostrarSecao('gestaoClientes')">👥 Clientes</a>
-            <a href="#configuracoes" onclick="mostrarSecao('configuracoes')">⚙ Configurações</a>
-            <a href="#" onclick="fazerLogout()">🚪 Sair</a>
-        </nav>
+    <!-- Tela de Bloqueio por Assinatura / Prazo -->
+    <div id="bloqueioOverlay" class="overlay" style="display: none;">
+        <div class="login-card bloqueio-card">
+            <div class="logo-box bloqueio-icone">!</div>
+            <h2>Acesso Suspenso</h2>
+            <p class="subtitulo-login">
+                O prazo de 30 dias corridos encerrou ou há pendência na assinatura desta empresa.
+            </p>
+            <p class="texto-apoio">
+                Entre em contato com o suporte para confirmar o pagamento e reativar o sistema.
+            </p>
+            <button type="button" onclick="fazerLogout()">Sair da Conta</button>
+        </div>
+    </div>
 
-    </aside>
-
-    <main>
-
-        <section id="visaoGeral">
-            <h2>📊 Visão Geral</h2>
-
-            <div class="cards">
-                <div class="card">
-                    <h3>Total de Clientes</h3>
-                    <p id="totalClientes">0 cadastrados</p>
-                </div>
-                <div class="card">
-                    <h3>Backup</h3>
-                    <button type="button" onclick="exportarClientesJSON()">📥 Exportar JSON</button>
+    <!-- Layout Principal -->
+    <div id="appLayout" class="app-layout" style="display: none;">
+        <aside class="sidebar">
+            <div class="marca-sidebar">
+                <div class="logo-box" id="logoLetra">M</div>
+                <div>
+                    <h2 id="nomeEmpresaSidebar">MULTITECH</h2>
+                    <p id="subtituloEmpresaSidebar">Gestão Inteligente para Pequenos Negócios</p>
                 </div>
             </div>
 
-            <br>
-            <h3>Buscar Cliente</h3>
-            <input
-                type="text"
-                id="buscarCliente"
-                placeholder="Digite para buscar..."
-                oninput="filtrarClientes()"
-            />
-        </section>
+            <div class="assinatura-badge" id="badgeAssinatura">
+                Assinatura: Ativa
+            </div>
 
-        <hr class="divisor">
+            <nav class="menu-nav">
+                <button type="button" class="nav-btn" onclick="mostrarSecao('dashboardSecao')">📊 Dashboard</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('planilhaOrcamentaria')">📋 Planilha Orçamentária</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('gestaoClientes')">👥 Clientes</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('configEmpresa')">⚙ Configurações</button>
+            </nav>
 
-        <section id="gestaoClientes">
-            <h2>👥 Gestão de Clientes</h2>
-            <input type="text" id="nomeCliente" placeholder="Nome do Cliente">
-            <br><br>
+            <button type="button" class="btn-sair" onclick="fazerLogout()">Sair</button>
+        </aside>
 
-            <input type="text" id="telefoneCliente" placeholder="Telefone">
-            <br><br>
+        <main class="conteudo-principal">
+            <!-- DASHBOARD -->
+            <section id="dashboardSecao" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h1>Dashboard Operacional</h1>
+                        <p class="descricao-secao">Visão geral dos clientes, planilhas orçamentárias e assinatura</p>
+                    </div>
+                    <div class="acoes-rapidas">
+                        <button type="button" class="btn-primario" onclick="prepararNovoOrcamento()">+ Novo Orçamento</button>
+                        <button type="button" class="btn-secundario" onclick="mostrarSecao('gestaoClientes')">+ Novo Cliente</button>
+                    </div>
+                </div>
 
-            <input type="email" id="emailCliente" placeholder="E-mail">
-            <br><br>
+                <div class="grid-kpis">
+                    <div class="kpi-card">
+                        <span class="kpi-label">Clientes Cadastrados</span>
+                        <strong class="kpi-valor" id="kpiTotalClientes">0</strong>
+                        <small class="kpi-sub">Base ativa na nuvem</small>
+                    </div>
 
-            <button type="button" onclick="cadastrarCliente()">
-                Salvar Cliente
-            </button>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Planilhas Orçamentárias</span>
+                        <strong class="kpi-valor" id="kpiTotalOrcamentos">0</strong>
+                        <small class="kpi-sub" id="kpiOrcamentosAprovados">0 aprovados</small>
+                    </div>
 
-            <hr>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Valor Total em Orçamentos</span>
+                        <strong class="kpi-valor" id="kpiValorTotalOrcamentos">R$ 0,00</strong>
+                        <small class="kpi-sub" id="kpiValorAprovado">Aprovado: R$ 0,00</small>
+                    </div>
 
-            <section class="clientes-box">
-                <h2>📋 Clientes Cadastrados</h2>
-                <div id="listaClientes" class="lista-clientes">
-                    <!-- clientes vão aparecer aqui -->
+                    <div class="kpi-card">
+                        <span class="kpi-label">Ciclo / Assinatura</span>
+                        <strong class="kpi-valor" id="kpiCicloDias">30 dias</strong>
+                        <small class="kpi-sub" id="kpiDetalheCiclo">Verificando prazo...</small>
+                    </div>
+                </div>
+
+                <div class="grid-duas-colunas">
+                    <div class="subcard">
+                        <h3>Últimos Orçamentos</h3>
+                        <div id="resumoUltimosOrcamentos" class="lista-resumo">
+                            <p class="texto-vazio">Nenhum orçamento lançado ainda.</p>
+                        </div>
+                    </div>
+
+                    <div class="subcard">
+                        <h3>Últimos Clientes</h3>
+                        <div id="resumoUltimosClientes" class="lista-resumo">
+                            <p class="texto-vazio">Nenhum cliente cadastrado ainda.</p>
+                        </div>
+                    </div>
                 </div>
             </section>
-        </section>
 
-        <hr class="divisor">
+            <!-- PLANILHA ORÇAMENTÁRIA -->
+            <section id="planilhaOrcamentaria" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Planilha Orçamentária</h2>
+                        <p class="descricao-secao">Monte orçamentos por item, calcule o total automaticamente e acompanhe o status</p>
+                    </div>
+                    <button type="button" class="btn-secundario" onclick="exportarOrcamentosJSON()">📥 Exportar Orçamentos JSON</button>
+                </div>
 
-        <section id="configuracoes" class="clientes-box">
-            <h2>⚙ Configurações da Empresa</h2>
-            <p>Personalize o nome exibido no sistema para o seu negócio:</p>
-            <input type="text" id="inputNomeEmpresa" placeholder="Nome do seu comércio (ex: Barbearia Silva)">
-            <input type="text" id="inputSubtituloEmpresa" placeholder="Subtítulo ou slogan">
-            <button type="button" onclick="salvarConfiguracoesEmpresa()">Salvar Identidade</button>
-        </section>
+                <div class="form-orcamento-topo">
+                    <div class="campo-grupo">
+                        <label for="orcTitulo">Título / Obra ou Serviço</label>
+                        <input type="text" id="orcTitulo" placeholder="Ex.: Reforma de cozinha / Pacote mensal">
+                    </div>
 
-    </main>
+                    <div class="campo-grupo">
+                        <label for="orcClienteNome">Cliente</label>
+                        <input type="text" id="orcClienteNome" list="sugestoesClientes" placeholder="Selecione ou digite o nome do cliente">
+                        <datalist id="sugestoesClientes"></datalist>
+                    </div>
 
-</div>
+                    <div class="campo-grupo">
+                        <label for="orcStatus">Status do Orçamento</label>
+                        <select id="orcStatus">
+                            <option value="Rascunho">Rascunho</option>
+                            <option value="Enviado">Enviado</option>
+                            <option value="Aprovado">Aprovado</option>
+                        </select>
+                    </div>
 
-<!-- Firebase SDKs (Compat) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="app.js"></script>
+                    <div class="campo-grupo">
+                        <label for="orcDesconto">Desconto (R$)</label>
+                        <input type="number" id="orcDesconto" step="0.01" min="0" value="0" oninput="recalcularTotaisPlanilha()">
+                    </div>
+                </div>
+
+                <div class="planilha-controles-itens">
+                    <button type="button" class="btn-secundario" onclick="adicionarLinhaItem()">+ Adicionar Item na Planilha</button>
+                    <button type="button" class="btn-limpar" onclick="limparFormularioOrcamento()">Limpar Formulário</button>
+                </div>
+
+                <div class="tabela-responsiva">
+                    <table class="tabela-planilha">
+                        <thead>
+                            <tr>
+                                <th>Descrição do Item / Serviço</th>
+                                <th class="col-curta">Unid.</th>
+                                <th class="col-numero">Qtd.</th>
+                                <th class="col-numero">Valor Unit. (R$)</th>
+                                <th class="col-numero">Subtotal (R$)</th>
+                                <th class="col-acao">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoItensPlanilha"></tbody>
+                    </table>
+                </div>
+
+                <div class="rodape-planilha">
+                    <div class="totais-planilha">
+                        <div>Subtotal dos itens: <strong id="planilhaSubtotal">R$ 0,00</strong></div>
+                        <div>Desconto: <strong id="planilhaDesconto">R$ 0,00</strong></div>
+                        <div class="total-destaque">Total Geral: <strong id="planilhaTotalGeral">R$ 0,00</strong></div>
+                    </div>
+
+                    <button type="button" class="btn-primario" id="btnSalvarOrcamento" onclick="salvarOrcamento()">
+                        Salvar Orçamento
+                    </button>
+                </div>
+
+                <hr class="divisor">
+
+                <div class="cabecalho-lista">
+                    <h3>Orçamentos Salvos</h3>
+                    <span id="totalOrcamentosBadge" class="badge-contagem">0 salvos</span>
+                </div>
+
+                <div class="barra-ferramentas">
+                    <input type="text" id="buscarOrcamento" placeholder="Buscar orçamento por título, cliente ou status..." oninput="filtrarOrcamentos()">
+                </div>
+
+                <div id="listaOrcamentos" class="lista-cards"></div>
+            </section>
+
+            <!-- GESTÃO DE CLIENTES -->
+            <section id="gestaoClientes" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Gestão de Clientes</h2>
+                        <p class="descricao-secao">Cadastre, edite, pesquise e exporte sua base de clientes</p>
+                    </div>
+                    <button type="button" class="btn-secundario" onclick="exportarClientesJSON()">📥 Exportar Clientes JSON</button>
+                </div>
+
+                <div class="grid-form-cliente">
+                    <input type="text" id="nomeCliente" placeholder="Nome completo ou empresa do cliente">
+                    <input type="text" id="telefoneCliente" placeholder="Telefone / WhatsApp">
+                    <input type="email" id="emailCliente" placeholder="E-mail do cliente">
+                    <button type="button" class="btn-primario" onclick="cadastrarCliente()">Salvar Cliente</button>
+                </div>
+
+                <hr class="divisor">
+
+                <div class="cabecalho-lista">
+                    <h3>Clientes Cadastrados</h3>
+                    <span id="totalClientes" class="badge-contagem">0 cadastrados</span>
+                </div>
+
+                <div class="barra-ferramentas">
+                    <input type="text" id="buscarCliente" placeholder="Buscar cliente por nome, telefone ou e-mail..." oninput="filtrarClientes()">
+                </div>
+
+                <div id="listaClientes" class="lista-cards"></div>
+            </section>
+
+            <!-- CONFIGURAÇÕES DA EMPRESA -->
+            <section id="configEmpresa" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Identidade da Empresa</h2>
+                        <p class="descricao-secao">Personalize o nome e o subtítulo exibidos no sistema</p>
+                    </div>
+                </div>
+
+                <div class="grid-config">
+                    <input type="text" id="inputNomeEmpresa" placeholder="Nome da empresa">
+                    <input type="text" id="inputSubtituloEmpresa" placeholder="Subtítulo da empresa">
+                    <button type="button" class="btn-primario" onclick="salvarConfiguracoesEmpresa()">Salvar Identidade</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="./app.js"></script>
 </body>
 </html>
