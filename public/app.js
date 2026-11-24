@@ -34,14 +34,14 @@ const PLANOS_PADRAO_TIERS = [
         nivel: "Standard",
         valor: 199.0,
         periodicidade: "Mensal",
-        descricao: "Gestão de orçamentos, portfólio de divulgação e vouchers de fidelidade com ótimo custo-benefício."
+        descricao: "Inclui integração com cliente final (agendamento online), orçamentos, portfólio e vouchers."
     },
     {
         nome: "Plano Premium",
         nivel: "Premium",
         valor: 397.0,
         periodicidade: "Mensal",
-        descricao: "Pacote completo com atendimento prioritário, destaque na vitrine e vantagens exclusivas."
+        descricao: "Tudo do Standard + balanço diário automático, alerta de clientes inativos (+15d) e lembretes."
     }
 ];
 
@@ -56,9 +56,14 @@ let orcamentosCache = [];
 let planosCache = [];
 let portfolioCache = [];
 let vouchersCache = [];
+let agendamentosCache = [];
 
 let diasCorridosAtual = 0;
 let statusAssinaturaAtual = "ativa";
+let nivelPlanoEmpresaAtual = "premium";
+
+const paramsUrl = new URLSearchParams(window.location.search);
+const empresaPublicaUid = paramsUrl.get("agendar");
 
 // Registro do Service Worker para o PWA
 if ("serviceWorker" in navigator) {
@@ -67,6 +72,55 @@ if ("serviceWorker" in navigator) {
             console.error("Erro ao registrar Service Worker:", err);
         });
     });
+}
+
+// Modo Público de Agendamento para o Cliente Final (?agendar=UID)
+if (empresaPublicaUid) {
+    window.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("agendamentoPublicoOverlay").style.display = "flex";
+        document.getElementById("loginOverlay").style.display = "none";
+        document.getElementById("appLayout").style.display = "none";
+    });
+}
+
+async function enviarAgendamentoPublico() {
+    if (!empresaPublicaUid) return;
+
+    const nome = document.getElementById("pubClienteNome")?.value.trim() || "";
+    const telefone = document.getElementById("pubClienteTelefone")?.value.trim() || "";
+    const servico = document.getElementById("pubServico")?.value.trim() || "";
+    const data = document.getElementById("pubData")?.value || "";
+    const hora = document.getElementById("pubHora")?.value || "";
+    const observacao = document.getElementById("pubObservacao")?.value.trim() || "";
+    const msgEl = document.getElementById("pubMensagem");
+
+    if (!nome || !telefone || !servico || !data || !hora) {
+        alert("Preencha nome, WhatsApp, serviço, data e horário.");
+        return;
+    }
+
+    try {
+        await db.collection("empresas").doc(empresaPublicaUid).collection("agendamentos").add({
+            clienteNome: nome,
+            clienteTelefone: telefone,
+            servico,
+            data,
+            hora,
+            observacao,
+            status: "Solicitado",
+            origem: "Cliente Final",
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        if (msgEl) msgEl.textContent = "Agendamento enviado com sucesso! Aguarde a confirmação.";
+        document.getElementById("pubClienteNome").value = "";
+        document.getElementById("pubClienteTelefone").value = "";
+        document.getElementById("pubServico").value = "";
+        document.getElementById("pubObservacao").value = "";
+    } catch (erro) {
+        console.error("Erro ao enviar agendamento:", erro);
+        alert("Não foi possível enviar o agendamento. Tente novamente.");
+    }
 }
 
 function atualizarStatusNuvem(estado, mensagemCustomizada = "") {
@@ -117,7 +171,7 @@ function atualizarIndicadorAssinatura() {
     const kpiDetalheCiclo = document.getElementById("kpiDetalheCiclo");
 
     if (statusAssinaturaAtual === "vitalicio") {
-        if (badge) badge.textContent = "Assinatura: Vitalícia";
+        if (badge) badge.textContent = `Assinatura: Vitalícia (${nivelPlanoEmpresaAtual.toUpperCase()})`;
         if (kpiCicloDias) kpiCicloDias.textContent = "Vitalício";
         if (kpiDetalheCiclo) kpiDetalheCiclo.textContent = "Acesso liberado sem expiração";
         return;
@@ -126,7 +180,7 @@ function atualizarIndicadorAssinatura() {
     const diasRestantes = Math.max(0, PRAZO_DIAS_ASSINATURA - diasCorridosAtual);
 
     if (badge) {
-        badge.textContent = `Ciclo 30 dias: ${diasCorridosAtual}d corridos (${diasRestantes}d restantes)`;
+        badge.textContent = `Plano ${nivelPlanoEmpresaAtual.toUpperCase()} • ${diasRestantes}d restantes`;
     }
     if (kpiCicloDias) {
         kpiCicloDias.textContent = `${diasRestantes}d rest.`;
@@ -136,8 +190,25 @@ function atualizarIndicadorAssinatura() {
     }
 }
 
+function aplicarPermissoesPorPlano() {
+    const liberaAgenda = nivelPlanoEmpresaAtual === "standard" || nivelPlanoEmpresaAtual === "premium";
+    const liberaPremium = nivelPlanoEmpresaAtual === "premium";
+
+    const agendaConteudo = document.getElementById("agendaConteudo");
+    const agendaAviso = document.getElementById("agendaBloqueadaAviso");
+    if (agendaConteudo) agendaConteudo.style.display = liberaAgenda ? "block" : "none";
+    if (agendaAviso) agendaAviso.style.display = liberaAgenda ? "none" : "block";
+
+    const premiumConteudo = document.getElementById("premiumConteudo");
+    const premiumAviso = document.getElementById("premiumBloqueadoAviso");
+    if (premiumConteudo) premiumConteudo.style.display = liberaPremium ? "grid" : "none";
+    if (premiumAviso) premiumAviso.style.display = liberaPremium ? "none" : "block";
+}
+
 // Monitora login, prazo de 30 dias corridos, status da assinatura e identidade da empresa
 auth.onAuthStateChanged(async (user) => {
+    if (empresaPublicaUid) return;
+
     const loginOverlay = document.getElementById("loginOverlay");
     const bloqueioOverlay = document.getElementById("bloqueioOverlay");
     const appLayout = document.getElementById("appLayout");
@@ -153,6 +224,7 @@ auth.onAuthStateChanged(async (user) => {
         planosCache = [];
         portfolioCache = [];
         vouchersCache = [];
+        agendamentosCache = [];
         if (loginOverlay) loginOverlay.style.display = "flex";
         if (bloqueioOverlay) bloqueioOverlay.style.display = "none";
         if (appLayout) appLayout.style.display = "none";
@@ -171,6 +243,7 @@ auth.onAuthStateChanged(async (user) => {
             nome: "MULTITECH",
             subtitulo: "Gestão Inteligente para Pequenos Negócios",
             status: "ativa",
+            nivelPlano: "premium",
             pagamentoConfirmado: false
         };
 
@@ -179,11 +252,13 @@ auth.onAuthStateChanged(async (user) => {
                 nome: dados.nome,
                 subtitulo: dados.subtitulo,
                 status: dados.status,
+                nivelPlano: dados.nivelPlano,
                 pagamentoConfirmado: false,
                 criadoEm: firebase.firestore.FieldValue.serverTimestamp()
             });
             diasCorridosAtual = 0;
             statusAssinaturaAtual = dados.status;
+            nivelPlanoEmpresaAtual = dados.nivelPlano;
         } else {
             dados = Object.assign(dados, doc.data());
 
@@ -213,6 +288,7 @@ auth.onAuthStateChanged(async (user) => {
             }
 
             statusAssinaturaAtual = dados.status || "ativa";
+            nivelPlanoEmpresaAtual = (dados.nivelPlano || "premium").toLowerCase();
         }
 
         if (statusAssinaturaAtual !== "ativa" && statusAssinaturaAtual !== "vitalicio") {
@@ -222,8 +298,9 @@ auth.onAuthStateChanged(async (user) => {
             return;
         }
 
-        aplicarIdentidade(dados.nome, dados.subtitulo);
+        aplicarIdentidade(dados.nome, dados.subtitulo, nivelPlanoEmpresaAtual);
         atualizarIndicadorAssinatura();
+        aplicarPermissoesPorPlano();
 
         if (bloqueioOverlay) bloqueioOverlay.style.display = "none";
         if (appLayout) appLayout.style.display = "flex";
@@ -234,9 +311,11 @@ auth.onAuthStateChanged(async (user) => {
             carregarPlanos(),
             carregarOrcamentos(),
             carregarPortfolio(),
-            carregarVouchers()
+            carregarVouchers(),
+            carregarAgendamentos()
         ]);
         atualizarDashboard();
+        atualizarAssistentePremium();
         atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao validar empresa:", erro);
@@ -276,7 +355,7 @@ async function fazerLogout() {
     }
 }
 
-function aplicarIdentidade(nome, subtitulo) {
+function aplicarIdentidade(nome, subtitulo, nivelPlano = "premium") {
     const nomeLimpo = (nome || "MULTITECH").trim() || "MULTITECH";
     const subtituloLimpo = (subtitulo || "Gestão Inteligente para Pequenos Negócios").trim();
 
@@ -285,6 +364,7 @@ function aplicarIdentidade(nome, subtitulo) {
     const logoLetra = document.getElementById("logoLetra");
     const inputNome = document.getElementById("inputNomeEmpresa");
     const inputSub = document.getElementById("inputSubtituloEmpresa");
+    const selectNivel = document.getElementById("selectNivelPlanoEmpresa");
 
     if (nomeSidebar) nomeSidebar.textContent = nomeLimpo;
     if (subSidebar) subSidebar.textContent = subtituloLimpo;
@@ -293,6 +373,7 @@ function aplicarIdentidade(nome, subtitulo) {
 
     if (inputNome) inputNome.value = nomeLimpo;
     if (inputSub) inputSub.value = subtituloLimpo;
+    if (selectNivel) selectNivel.value = nivelPlano;
 }
 
 async function salvarConfiguracoesEmpresa() {
@@ -300,21 +381,27 @@ async function salvarConfiguracoesEmpresa() {
 
     const inputNome = document.getElementById("inputNomeEmpresa");
     const inputSub = document.getElementById("inputSubtituloEmpresa");
+    const selectNivel = document.getElementById("selectNivelPlanoEmpresa");
 
     const nome = inputNome && inputNome.value.trim() ? inputNome.value.trim() : "MULTITECH";
     const subtitulo = inputSub && inputSub.value.trim()
         ? inputSub.value.trim()
         : "Gestão Inteligente para Pequenos Negócios";
+    const nivelPlano = selectNivel ? selectNivel.value : "premium";
 
     atualizarStatusNuvem("sincronizando");
     try {
         await db.collection("empresas").doc(usuarioAtual.uid).set(
-            { nome, subtitulo },
+            { nome, subtitulo, nivelPlano },
             { merge: true }
         );
-        aplicarIdentidade(nome, subtitulo);
+        nivelPlanoEmpresaAtual = nivelPlano;
+        aplicarIdentidade(nome, subtitulo, nivelPlano);
+        atualizarIndicadorAssinatura();
+        aplicarPermissoesPorPlano();
+        atualizarAssistentePremium();
         atualizarStatusNuvem("sincronizado");
-        alert("Identidade da empresa salva com sucesso!");
+        alert("Configurações da empresa salvas com sucesso!");
     } catch (erro) {
         console.error("Erro ao salvar configurações:", erro);
         atualizarStatusNuvem("erro");
@@ -395,6 +482,219 @@ function renderizarResumoDashboard() {
             });
         }
     }
+}
+
+/* ==================== AGENDA & CLIENTE FINAL (STANDARD / PREMIUM) ==================== */
+function copiarLinkAgendamento() {
+    if (!usuarioAtual) return;
+    const base = window.location.href.split("?")[0];
+    const link = `${base}?agendar=${usuarioAtual.uid}`;
+    navigator.clipboard?.writeText(link);
+    alert(`Link de agendamento copiado:\n${link}`);
+}
+
+async function salvarAgendamentoManual() {
+    if (!usuarioAtual) return;
+
+    const clienteNome = document.getElementById("agClienteNome")?.value.trim() || "";
+    const clienteTelefone = document.getElementById("agClienteTelefone")?.value.trim() || "";
+    const servico = document.getElementById("agServico")?.value.trim() || "";
+    const data = document.getElementById("agData")?.value || "";
+    const hora = document.getElementById("agHora")?.value || "";
+
+    if (!clienteNome || !servico || !data || !hora) {
+        alert("Preencha cliente, serviço, data e horário.");
+        return;
+    }
+
+    atualizarStatusNuvem("sincronizando");
+    try {
+        await db.collection("empresas").doc(usuarioAtual.uid).collection("agendamentos").add({
+            clienteNome,
+            clienteTelefone,
+            servico,
+            data,
+            hora,
+            status: "Confirmado",
+            origem: "Painel",
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        document.getElementById("agClienteNome").value = "";
+        document.getElementById("agClienteTelefone").value = "";
+        document.getElementById("agServico").value = "";
+        await carregarAgendamentos();
+        atualizarAssistentePremium();
+        atualizarStatusNuvem("sincronizado");
+    } catch (erro) {
+        console.error("Erro ao salvar agendamento:", erro);
+        atualizarStatusNuvem("erro");
+        alert("Erro ao salvar agendamento.");
+    }
+}
+
+async function carregarAgendamentos() {
+    if (!usuarioAtual) return;
+
+    try {
+        const snapshot = await db
+            .collection("empresas")
+            .doc(usuarioAtual.uid)
+            .collection("agendamentos")
+            .get();
+
+        agendamentosCache = [];
+        snapshot.forEach((doc) => agendamentosCache.push({ id: doc.id, ...doc.data() }));
+
+        agendamentosCache.sort((a, b) => `${a.data || ""} ${a.hora || ""}`.localeCompare(`${b.data || ""} ${b.hora || ""}`));
+
+        const badge = document.getElementById("totalAgendamentosBadge");
+        if (badge) badge.textContent = `${agendamentosCache.length} agendamentos`;
+
+        renderizarAgendamentos();
+    } catch (erro) {
+        console.error("Erro ao carregar agendamentos:", erro);
+    }
+}
+
+function renderizarAgendamentos() {
+    const lista = document.getElementById("listaAgendamentos");
+    if (!lista) return;
+    lista.innerHTML = "";
+
+    if (agendamentosCache.length === 0) {
+        lista.innerHTML = '<p class="texto-vazio">Nenhum agendamento registrado ainda.</p>';
+        return;
+    }
+
+    agendamentosCache.forEach((ag) => {
+        const card = document.createElement("div");
+        card.className = "modulo-card";
+        const classeStatus = ag.status === "Concluído" ? "status-aprovado" : ag.status === "Confirmado" ? "status-enviado" : "";
+
+        card.innerHTML = `
+            <div class="card-topo">
+                <strong>${escaparHTML(ag.clienteNome || "Cliente")}</strong>
+                <span class="status-pill ${classeStatus}">${escaparHTML(ag.status || "Solicitado")}</span>
+            </div>
+            <div>📅 ${escaparHTML(ag.data || "")} às <strong>${escaparHTML(ag.hora || "")}</strong></div>
+            <div>🛠 ${escaparHTML(ag.servico || "")}</div>
+            <div>📞 ${escaparHTML(ag.clienteTelefone || "Não informado")}</div>
+        `;
+
+        const acoes = document.createElement("div");
+        acoes.className = "acoes-card";
+
+        const btnStatus = document.createElement("button");
+        btnStatus.type = "button";
+        btnStatus.className = "btn-secundario";
+        btnStatus.textContent = ag.status === "Confirmado" ? "Concluir" : "Confirmar";
+        btnStatus.addEventListener("click", async () => {
+            const novoStatus = ag.status === "Confirmado" ? "Concluído" : "Confirmado";
+            atualizarStatusNuvem("sincronizando");
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("agendamentos").doc(ag.id).update({ status: novoStatus });
+            await carregarAgendamentos();
+            atualizarAssistentePremium();
+            atualizarStatusNuvem("sincronizado");
+        });
+
+        const btnExcluir = document.createElement("button");
+        btnExcluir.type = "button";
+        btnExcluir.className = "btn-remover-linha";
+        btnExcluir.textContent = "Excluir";
+        btnExcluir.addEventListener("click", async () => {
+            if (!confirm("Excluir este agendamento?")) return;
+            atualizarStatusNuvem("sincronizando");
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("agendamentos").doc(ag.id).delete();
+            await carregarAgendamentos();
+            atualizarAssistentePremium();
+            atualizarStatusNuvem("sincronizado");
+        });
+
+        acoes.appendChild(btnStatus);
+        acoes.appendChild(btnExcluir);
+        card.appendChild(acoes);
+        lista.appendChild(card);
+    });
+}
+
+/* ==================== ASSISTENTE AUTOMÁTICO (PREMIUM) ==================== */
+function gerarTextoBalancoDiario() {
+    const aprovados = orcamentosCache.filter((o) => o.status === "Aprovado");
+    const faturamentoAprovado = aprovados.reduce((acc, o) => acc + (Number(o.totalGeral) || 0), 0);
+    const emAberto = orcamentosCache
+        .filter((o) => o.status !== "Aprovado")
+        .reduce((acc, o) => acc + (Number(o.totalGeral) || 0), 0);
+    const agendamentosPendentes = agendamentosCache.filter((a) => a.status !== "Concluído").length;
+
+    return `Balanço Diário MultiTech: Faturamento aprovado de ${formatarMoeda(faturamentoAprovado)} | Em aberto: ${formatarMoeda(emAberto)} | Clientes: ${clientesCache.length} | Agendamentos ativos: ${agendamentosPendentes}.`;
+}
+
+function atualizarAssistentePremium() {
+    const boxBalanco = document.getElementById("boxBalancoDiario");
+    const boxLembretes = document.getElementById("boxLembretesPremium");
+    if (!boxBalanco || !boxLembretes) return;
+
+    const aprovados = orcamentosCache.filter((o) => o.status === "Aprovado");
+    const faturamentoAprovado = aprovados.reduce((acc, o) => acc + (Number(o.totalGeral) || 0), 0);
+    const emAberto = orcamentosCache
+        .filter((o) => o.status !== "Aprovado")
+        .reduce((acc, o) => acc + (Number(o.totalGeral) || 0), 0);
+    const agAtivos = agendamentosCache.filter((a) => a.status !== "Concluído").length;
+
+    boxBalanco.innerHTML = `
+        <div class="item-resumo"><span>Faturamento aprovado</span><strong>${formatarMoeda(faturamentoAprovado)}</strong></div>
+        <div class="item-resumo"><span>Orçamentos em negociação</span><strong>${formatarMoeda(emAberto)}</strong></div>
+        <div class="item-resumo"><span>Agendamentos ativos na fila</span><strong>${agAtivos}</strong></div>
+    `;
+
+    const agora = Date.now();
+    const inativos = clientesCache.filter((cli) => {
+        const nomeCli = (cli.nome || "").toLowerCase().trim();
+        let ultimaData = cli.criadoEm?.toMillis ? cli.criadoEm.toMillis() : 0;
+
+        orcamentosCache.forEach((o) => {
+            if ((o.clienteNome || "").toLowerCase().trim() === nomeCli && o.criadoEm?.toMillis) {
+                ultimaData = Math.max(ultimaData, o.criadoEm.toMillis());
+            }
+        });
+
+        agendamentosCache.forEach((a) => {
+            if ((a.clienteNome || "").toLowerCase().trim() === nomeCli && a.criadoEm?.toMillis) {
+                ultimaData = Math.max(ultimaData, a.criadoEm.toMillis());
+            }
+        });
+
+        if (!ultimaData) return false;
+        const diasSemContato = Math.floor((agora - ultimaData) / MS_POR_DIA);
+        return diasSemContato >= 15;
+    });
+
+    boxLembretes.innerHTML = "";
+    if (inativos.length === 0) {
+        boxLembretes.innerHTML += '<div class="item-resumo"><span>Nenhum cliente inativo há mais de 15 dias.</span><strong>OK</strong></div>';
+    } else {
+        inativos.slice(0, 3).forEach((cli) => {
+            const div = document.createElement("div");
+            div.className = "item-resumo";
+            div.innerHTML = `<span>Faz mais de 15 dias que <strong>${escaparHTML(cli.nome)}</strong> não procura seus serviços.</span><small>Enviar voucher</small>`;
+            boxLembretes.appendChild(div);
+        });
+    }
+
+    const sugestaoPost = portfolioCache.length > 0
+        ? `Lembrete de Post: divulgue "${portfolioCache[0].titulo}" do seu Portfólio hoje nas redes sociais!`
+        : "Lembrete de Post: publique um trabalho no Portfólio e compartilhe com seus clientes!";
+    const postDiv = document.createElement("div");
+    postDiv.className = "item-resumo";
+    postDiv.innerHTML = `<span>📱 ${escaparHTML(sugestaoPost)}</span>`;
+    boxLembretes.appendChild(postDiv);
+}
+
+function copiarBalancoDiario() {
+    const texto = gerarTextoBalancoDiario();
+    navigator.clipboard?.writeText(texto);
+    alert("Balanço diário copiado para a área de transferência!");
 }
 
 /* ==================== PLANOS (BÁSICO / STANDARD / PREMIUM) ==================== */
@@ -821,6 +1121,7 @@ async function salvarOrcamento() {
         limparFormularioOrcamento();
         await carregarOrcamentos();
         atualizarDashboard();
+        atualizarAssistentePremium();
         atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar orçamento:", erro);
@@ -927,6 +1228,7 @@ function renderizarOrcamentos(listaDados) {
                 if (orcamentoEditando === orc.id) limparFormularioOrcamento();
                 await carregarOrcamentos();
                 atualizarDashboard();
+                atualizarAssistentePremium();
                 atualizarStatusNuvem("sincronizado");
             } catch (erro) {
                 atualizarStatusNuvem("erro");
@@ -1026,6 +1328,7 @@ async function cadastrarCliente() {
 
         await carregarClientes();
         atualizarDashboard();
+        atualizarAssistentePremium();
         atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar cliente:", erro);
@@ -1103,6 +1406,7 @@ function renderizarClientes(listaDados) {
                 if (clienteEditando === cliente.id) clienteEditando = null;
                 await carregarClientes();
                 atualizarDashboard();
+                atualizarAssistentePremium();
                 atualizarStatusNuvem("sincronizado");
             } catch (erro) {
                 atualizarStatusNuvem("erro");
@@ -1232,6 +1536,7 @@ async function salvarItemPortfolio() {
 
         await carregarPortfolio();
         atualizarDashboard();
+        atualizarAssistentePremium();
         atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar portfólio:", erro);
@@ -1314,6 +1619,7 @@ function renderizarPortfolio() {
                 await db.collection("empresas").doc(usuarioAtual.uid).collection("portfolio").doc(item.id).delete();
                 await carregarPortfolio();
                 atualizarDashboard();
+                atualizarAssistentePremium();
                 atualizarStatusNuvem("sincronizado");
             } catch (erro) {
                 atualizarStatusNuvem("erro");
