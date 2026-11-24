@@ -20,11 +20,42 @@ if (typeof firebase.analytics === "function") {
 const PRAZO_DIAS_ASSINATURA = 30;
 const MS_POR_DIA = 1000 * 60 * 60 * 24;
 
+const PLANOS_PADRAO_TIERS = [
+    {
+        nome: "Plano Básico",
+        nivel: "Básico",
+        valor: 197.0,
+        periodicidade: "Mensal",
+        descricao: "Cadastro base, planilha orçamentária essencial e atendimento padrão."
+    },
+    {
+        nome: "Plano Standard",
+        nivel: "Standard",
+        valor: 347.0,
+        periodicidade: "Mensal",
+        descricao: "Gestão completa de orçamentos, portfólio de divulgação e vouchers de fidelidade."
+    },
+    {
+        nome: "Plano Premium",
+        nivel: "Premium",
+        valor: 597.0,
+        periodicidade: "Mensal",
+        descricao: "Pacote completo com prioridade de atendimento, planos avançados e destaque na vitrine."
+    }
+];
+
 let usuarioAtual = null;
 let clienteEditando = null;
 let orcamentoEditando = null;
+let planoEditando = null;
+let portfolioEditando = null;
+
 let clientesCache = [];
 let orcamentosCache = [];
+let planosCache = [];
+let portfolioCache = [];
+let vouchersCache = [];
+
 let diasCorridosAtual = 0;
 let statusAssinaturaAtual = "ativa";
 
@@ -98,8 +129,13 @@ auth.onAuthStateChanged(async (user) => {
         usuarioAtual = null;
         clienteEditando = null;
         orcamentoEditando = null;
+        planoEditando = null;
+        portfolioEditando = null;
         clientesCache = [];
         orcamentosCache = [];
+        planosCache = [];
+        portfolioCache = [];
+        vouchersCache = [];
         if (loginOverlay) loginOverlay.style.display = "flex";
         if (bloqueioOverlay) bloqueioOverlay.style.display = "none";
         if (appLayout) appLayout.style.display = "none";
@@ -174,7 +210,13 @@ auth.onAuthStateChanged(async (user) => {
         if (appLayout) appLayout.style.display = "flex";
 
         inicializarPlanilhaSeVazia();
-        await Promise.all([carregarClientes(), carregarOrcamentos()]);
+        await Promise.all([
+            carregarClientes(),
+            carregarPlanos(),
+            carregarOrcamentos(),
+            carregarPortfolio(),
+            carregarVouchers()
+        ]);
         atualizarDashboard();
     } catch (erro) {
         console.error("Erro ao validar empresa:", erro);
@@ -265,6 +307,7 @@ function atualizarDashboard() {
     const kpiOrcAprov = document.getElementById("kpiOrcamentosAprovados");
     const kpiValorTotal = document.getElementById("kpiValorTotalOrcamentos");
     const kpiValorAprov = document.getElementById("kpiValorAprovado");
+    const kpiModulos = document.getElementById("kpiResumoModulos");
 
     if (kpiClientes) kpiClientes.textContent = String(clientesCache.length);
 
@@ -276,6 +319,9 @@ function atualizarDashboard() {
     if (kpiOrcAprov) kpiOrcAprov.textContent = `${aprovados.length} aprovados`;
     if (kpiValorTotal) kpiValorTotal.textContent = formatarMoeda(somaGeral);
     if (kpiValorAprov) kpiValorAprov.textContent = `Aprovado: ${formatarMoeda(somaAprovada)}`;
+    if (kpiModulos) {
+        kpiModulos.textContent = `${planosCache.length} / ${portfolioCache.length} / ${vouchersCache.length}`;
+    }
 
     renderizarResumoDashboard();
 }
@@ -327,6 +373,227 @@ function renderizarResumoDashboard() {
     }
 }
 
+/* ==================== PLANOS (BÁSICO / STANDARD / PREMIUM) ==================== */
+async function restaurarPlanosPadrao() {
+    if (!usuarioAtual) return;
+    if (!confirm("Adicionar os planos padrão Básico, Standard e Premium na sua lista?")) return;
+
+    const refPlanos = db.collection("empresas").doc(usuarioAtual.uid).collection("planos");
+    try {
+        for (const p of PLANOS_PADRAO_TIERS) {
+            await refPlanos.add({
+                ...p,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        await carregarPlanos();
+        atualizarDashboard();
+        alert("Planos Básico, Standard e Premium adicionados!");
+    } catch (erro) {
+        console.error("Erro ao criar planos padrão:", erro);
+        alert("Erro ao criar planos padrão.");
+    }
+}
+
+async function salvarPlano() {
+    if (!usuarioAtual) return;
+
+    const nome = document.getElementById("planoNome")?.value.trim() || "";
+    const nivel = document.getElementById("planoNivel")?.value || "Básico";
+    const valor = Math.max(0, Number(document.getElementById("planoValor")?.value) || 0);
+    const periodicidade = document.getElementById("planoPeriodicidade")?.value.trim() || "Mensal";
+    const descricao = document.getElementById("planoDescricao")?.value.trim() || "";
+
+    if (!nome) {
+        alert("Informe o nome do plano ou serviço.");
+        return;
+    }
+
+    const refPlanos = db.collection("empresas").doc(usuarioAtual.uid).collection("planos");
+    const payload = { nome, nivel, valor, periodicidade, descricao };
+
+    try {
+        if (planoEditando) {
+            await refPlanos.doc(planoEditando).update({
+                ...payload,
+                atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            await refPlanos.add({
+                ...payload,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        planoEditando = null;
+        document.getElementById("planoNome").value = "";
+        document.getElementById("planoValor").value = "";
+        document.getElementById("planoPeriodicidade").value = "";
+        document.getElementById("planoDescricao").value = "";
+        document.getElementById("btnSalvarPlano").textContent = "Salvar Plano";
+
+        await carregarPlanos();
+        atualizarDashboard();
+    } catch (erro) {
+        console.error("Erro ao salvar plano:", erro);
+        alert("Erro ao salvar plano.");
+    }
+}
+
+async function carregarPlanos() {
+    if (!usuarioAtual) return;
+
+    try {
+        const snapshot = await db
+            .collection("empresas")
+            .doc(usuarioAtual.uid)
+            .collection("planos")
+            .get();
+
+        planosCache = [];
+        snapshot.forEach((doc) => planosCache.push({ id: doc.id, ...doc.data() }));
+
+        if (planosCache.length === 0) {
+            const refPlanos = db.collection("empresas").doc(usuarioAtual.uid).collection("planos");
+            for (const p of PLANOS_PADRAO_TIERS) {
+                const novoDoc = await refPlanos.add({
+                    ...p,
+                    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                planosCache.push({ id: novoDoc.id, ...p });
+            }
+        }
+
+        const badge = document.getElementById("totalPlanosBadge");
+        if (badge) badge.textContent = `${planosCache.length} planos`;
+
+        atualizarSelectPlanosOrcamento();
+        renderizarPlanos();
+    } catch (erro) {
+        console.error("Erro ao carregar planos:", erro);
+    }
+}
+
+function atualizarSelectPlanosOrcamento() {
+    const select = document.getElementById("selectPlanoRapido");
+    if (!select) return;
+
+    select.innerHTML = "";
+    if (planosCache.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Nenhum plano cadastrado";
+        select.appendChild(opt);
+        return;
+    }
+
+    planosCache.forEach((p, idx) => {
+        const opt = document.createElement("option");
+        opt.value = String(idx);
+        opt.textContent = `${p.nome} [${p.nivel || "Serviço"}] — ${formatarMoeda(p.valor)}`;
+        select.appendChild(opt);
+    });
+}
+
+function inserirPlanoNaPlanilha() {
+    const select = document.getElementById("selectPlanoRapido");
+    const idx = Number(select?.value);
+    const plano = planosCache[idx];
+    if (!plano) {
+        alert("Selecione um plano ou serviço válido.");
+        return;
+    }
+
+    const linhas = document.querySelectorAll("#corpoItensPlanilha tr.linha-item-planilha");
+    if (linhas.length === 1) {
+        const descUnica = linhas[0].querySelector(".item-desc")?.value.trim();
+        const valUnico = Number(linhas[0].querySelector(".item-valor")?.value) || 0;
+        if (!descUnica && valUnico === 0) {
+            linhas[0].querySelector(".item-desc").value = `${plano.nome} (${plano.nivel || "Serviço"})`;
+            linhas[0].querySelector(".item-unid").value = plano.periodicidade || "serv";
+            linhas[0].querySelector(".item-qtd").value = 1;
+            linhas[0].querySelector(".item-valor").value = Number(plano.valor) || 0;
+            recalcularTotaisPlanilha();
+            return;
+        }
+    }
+
+    adicionarLinhaItem({
+        descricao: `${plano.nome} (${plano.nivel || "Serviço"})`,
+        unidade: plano.periodicidade || "serv",
+        quantidade: 1,
+        valorUnitario: Number(plano.valor) || 0
+    });
+}
+
+function renderizarPlanos() {
+    const lista = document.getElementById("listaPlanos");
+    if (!lista) return;
+    lista.innerHTML = "";
+
+    planosCache.forEach((plano) => {
+        const card = document.createElement("div");
+        card.className = "modulo-card";
+        card.innerHTML = `
+            <div class="card-topo">
+                <strong>${escaparHTML(plano.nome)}</strong>
+                <span class="status-pill">${escaparHTML(plano.nivel || "Serviço")}</span>
+            </div>
+            <div>Valor: <strong>${formatarMoeda(plano.valor)}</strong> • ${escaparHTML(plano.periodicidade || "Mensal")}</div>
+            <div>${escaparHTML(plano.descricao || "")}</div>
+        `;
+
+        const acoes = document.createElement("div");
+        acoes.className = "acoes-card";
+
+        const btnOrc = document.createElement("button");
+        btnOrc.type = "button";
+        btnOrc.className = "btn-primario";
+        btnOrc.textContent = "Usar no Orçamento";
+        btnOrc.addEventListener("click", () => {
+            mostrarSecao("planilhaOrcamentaria");
+            adicionarLinhaItem({
+                descricao: `${plano.nome} (${plano.nivel || "Serviço"})`,
+                unidade: plano.periodicidade || "serv",
+                quantidade: 1,
+                valorUnitario: Number(plano.valor) || 0
+            });
+        });
+
+        const btnEditar = document.createElement("button");
+        btnEditar.type = "button";
+        btnEditar.className = "btn-secundario";
+        btnEditar.textContent = "Editar";
+        btnEditar.addEventListener("click", () => {
+            planoEditando = plano.id;
+            document.getElementById("planoNome").value = plano.nome || "";
+            document.getElementById("planoNivel").value = plano.nivel || "Básico";
+            document.getElementById("planoValor").value = plano.valor || 0;
+            document.getElementById("planoPeriodicidade").value = plano.periodicidade || "";
+            document.getElementById("planoDescricao").value = plano.descricao || "";
+            document.getElementById("btnSalvarPlano").textContent = "Atualizar Plano";
+            mostrarSecao("planosServicos");
+        });
+
+        const btnExcluir = document.createElement("button");
+        btnExcluir.type = "button";
+        btnExcluir.className = "btn-remover-linha";
+        btnExcluir.textContent = "Excluir";
+        btnExcluir.addEventListener("click", async () => {
+            if (!confirm("Excluir este plano?")) return;
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("planos").doc(plano.id).delete();
+            await carregarPlanos();
+            atualizarDashboard();
+        });
+
+        acoes.appendChild(btnOrc);
+        acoes.appendChild(btnEditar);
+        acoes.appendChild(btnExcluir);
+        card.appendChild(acoes);
+        lista.appendChild(card);
+    });
+}
+
 /* ==================== PLANILHA ORÇAMENTÁRIA ==================== */
 function inicializarPlanilhaSeVazia() {
     const tbody = document.getElementById("corpoItensPlanilha");
@@ -348,7 +615,7 @@ function adicionarLinhaItem(item = {}) {
     const inputDesc = document.createElement("input");
     inputDesc.type = "text";
     inputDesc.className = "item-desc";
-    inputDesc.placeholder = "Ex.: Mão de obra / Material / Serviço";
+    inputDesc.placeholder = "Ex.: Plano Standard / Serviço escolhido";
     inputDesc.value = item.descricao || "";
     tdDesc.appendChild(inputDesc);
 
@@ -458,19 +725,13 @@ function recalcularTotaisPlanilha() {
 
 function limparFormularioOrcamento() {
     orcamentoEditando = null;
-    const tituloEl = document.getElementById("orcTitulo");
-    const clienteEl = document.getElementById("orcClienteNome");
-    const statusEl = document.getElementById("orcStatus");
-    const descontoEl = document.getElementById("orcDesconto");
+    document.getElementById("orcTitulo").value = "";
+    document.getElementById("orcClienteNome").value = "";
+    document.getElementById("orcStatus").value = "Rascunho";
+    document.getElementById("orcDesconto").value = "0";
+    document.getElementById("btnSalvarOrcamento").textContent = "Salvar Orçamento";
+
     const tbody = document.getElementById("corpoItensPlanilha");
-    const btnSalvar = document.getElementById("btnSalvarOrcamento");
-
-    if (tituloEl) tituloEl.value = "";
-    if (clienteEl) clienteEl.value = "";
-    if (statusEl) statusEl.value = "Rascunho";
-    if (descontoEl) descontoEl.value = "0";
-    if (btnSalvar) btnSalvar.textContent = "Salvar Orçamento";
-
     if (tbody) {
         tbody.innerHTML = "";
         adicionarLinhaItem({ descricao: "", unidade: "un", quantidade: 1, valorUnitario: 0 });
@@ -498,24 +759,12 @@ async function salvarOrcamento() {
     }
 
     if (itens.length === 0) {
-        alert("Adicione pelo menos um item na planilha orçamentária.");
+        alert("Adicione pelo menos um item ou serviço na planilha.");
         return;
     }
 
-    const refOrcamentos = db
-        .collection("empresas")
-        .doc(usuarioAtual.uid)
-        .collection("orcamentos");
-
-    const payload = {
-        titulo,
-        clienteNome,
-        status,
-        itens,
-        subtotalItens,
-        desconto,
-        totalGeral
-    };
+    const refOrcamentos = db.collection("empresas").doc(usuarioAtual.uid).collection("orcamentos");
+    const payload = { titulo, clienteNome, status, itens, subtotalItens, desconto, totalGeral };
 
     try {
         if (orcamentoEditando) {
@@ -551,9 +800,7 @@ async function carregarOrcamentos() {
             .get();
 
         orcamentosCache = [];
-        snapshot.forEach((doc) => {
-            orcamentosCache.push({ id: doc.id, ...doc.data() });
-        });
+        snapshot.forEach((doc) => orcamentosCache.push({ id: doc.id, ...doc.data() }));
 
         orcamentosCache.sort((a, b) => {
             const ta = a.criadoEm?.toMillis ? a.criadoEm.toMillis() : 0;
@@ -562,14 +809,11 @@ async function carregarOrcamentos() {
         });
 
         const badge = document.getElementById("totalOrcamentosBadge");
-        if (badge) {
-            badge.textContent = `${orcamentosCache.length} salvos`;
-        }
+        if (badge) badge.textContent = `${orcamentosCache.length} salvos`;
 
         filtrarOrcamentos();
     } catch (erro) {
         console.error("Erro ao carregar orçamentos:", erro);
-        alert("Erro ao carregar os orçamentos.");
     }
 }
 
@@ -592,7 +836,6 @@ function filtrarOrcamentos() {
 function renderizarOrcamentos(listaDados) {
     const lista = document.getElementById("listaOrcamentos");
     if (!lista) return;
-
     lista.innerHTML = "";
 
     if (listaDados.length === 0) {
@@ -614,17 +857,16 @@ function renderizarOrcamentos(listaDados) {
         const qtdItens = Array.isArray(orc.itens) ? orc.itens.length : 0;
 
         card.innerHTML = `
-            <div class="orcamento-topo-card">
+            <div class="card-topo">
                 <strong>${escaparHTML(orc.titulo || "Sem título")}</strong>
                 <span class="status-pill ${classeStatus}">${escaparHTML(orc.status || "Rascunho")}</span>
             </div>
             <div>Cliente: <strong>${escaparHTML(orc.clienteNome || "Não informado")}</strong></div>
-            <div>Itens na planilha: ${qtdItens}</div>
-            <div>Total: <strong>${formatarMoeda(orc.totalGeral)}</strong></div>
+            <div>Itens/Serviços: ${qtdItens} • Total: <strong>${formatarMoeda(orc.totalGeral)}</strong></div>
         `;
 
         const acoes = document.createElement("div");
-        acoes.style.marginTop = "10px";
+        acoes.className = "acoes-card";
 
         const btnEditar = document.createElement("button");
         btnEditar.type = "button";
@@ -635,40 +877,36 @@ function renderizarOrcamentos(listaDados) {
         const btnExcluir = document.createElement("button");
         btnExcluir.type = "button";
         btnExcluir.className = "btn-remover-linha";
-        btnExcluir.style.marginLeft = "8px";
         btnExcluir.textContent = "Excluir";
-        btnExcluir.addEventListener("click", () => excluirOrcamento(orc.id));
+        btnExcluir.addEventListener("click", async () => {
+            if (!confirm("Excluir este orçamento?")) return;
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("orcamentos").doc(orc.id).delete();
+            if (orcamentoEditando === orc.id) limparFormularioOrcamento();
+            await carregarOrcamentos();
+            atualizarDashboard();
+        });
 
         acoes.appendChild(btnEditar);
         acoes.appendChild(btnExcluir);
         card.appendChild(acoes);
-
         lista.appendChild(card);
     });
 }
 
 function carregarOrcamentoNoFormulario(orc) {
     orcamentoEditando = orc.id;
+    document.getElementById("orcTitulo").value = orc.titulo || "";
+    document.getElementById("orcClienteNome").value = orc.clienteNome || "";
+    document.getElementById("orcStatus").value = orc.status || "Rascunho";
+    document.getElementById("orcDesconto").value = orc.desconto || 0;
+    document.getElementById("btnSalvarOrcamento").textContent = "Atualizar Orçamento";
 
-    const tituloEl = document.getElementById("orcTitulo");
-    const clienteEl = document.getElementById("orcClienteNome");
-    const statusEl = document.getElementById("orcStatus");
-    const descontoEl = document.getElementById("orcDesconto");
     const tbody = document.getElementById("corpoItensPlanilha");
-    const btnSalvar = document.getElementById("btnSalvarOrcamento");
-
-    if (tituloEl) tituloEl.value = orc.titulo || "";
-    if (clienteEl) clienteEl.value = orc.clienteNome || "";
-    if (statusEl) statusEl.value = orc.status || "Rascunho";
-    if (descontoEl) descontoEl.value = orc.desconto || 0;
-    if (btnSalvar) btnSalvar.textContent = "Atualizar Orçamento";
-
     if (tbody) {
         tbody.innerHTML = "";
         const itens = Array.isArray(orc.itens) && orc.itens.length > 0
             ? orc.itens
             : [{ descricao: "", unidade: "un", quantidade: 1, valorUnitario: 0 }];
-
         itens.forEach((item) => adicionarLinhaItem(item));
     }
 
@@ -676,34 +914,8 @@ function carregarOrcamentoNoFormulario(orc) {
     mostrarSecao("planilhaOrcamentaria");
 }
 
-async function excluirOrcamento(id) {
-    if (!usuarioAtual || !id) return;
-    if (!confirm("Deseja realmente excluir este orçamento?")) return;
-
-    try {
-        await db
-            .collection("empresas")
-            .doc(usuarioAtual.uid)
-            .collection("orcamentos")
-            .doc(id)
-            .delete();
-
-        if (orcamentoEditando === id) {
-            limparFormularioOrcamento();
-        }
-
-        await carregarOrcamentos();
-        atualizarDashboard();
-    } catch (erro) {
-        console.error("Erro ao excluir orçamento:", erro);
-        alert("Erro ao excluir orçamento.");
-    }
-}
-
 function exportarOrcamentosJSON() {
-    const blob = new Blob([JSON.stringify(orcamentosCache, null, 2)], {
-        type: "application/json"
-    });
+    const blob = new Blob([JSON.stringify(orcamentosCache, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -718,7 +930,6 @@ function exportarOrcamentosJSON() {
 function atualizarSugestoesClientes() {
     const datalist = document.getElementById("sugestoesClientes");
     if (!datalist) return;
-
     datalist.innerHTML = "";
     clientesCache.forEach((cli) => {
         if (!cli.nome) return;
@@ -731,23 +942,16 @@ function atualizarSugestoesClientes() {
 async function cadastrarCliente() {
     if (!usuarioAtual) return;
 
-    const nomeEl = document.getElementById("nomeCliente");
-    const telefoneEl = document.getElementById("telefoneCliente");
-    const emailEl = document.getElementById("emailCliente");
-
-    const nome = nomeEl ? nomeEl.value.trim() : "";
-    const telefone = telefoneEl ? telefoneEl.value.trim() : "";
-    const email = emailEl ? emailEl.value.trim() : "";
+    const nome = document.getElementById("nomeCliente")?.value.trim() || "";
+    const telefone = document.getElementById("telefoneCliente")?.value.trim() || "";
+    const email = document.getElementById("emailCliente")?.value.trim() || "";
 
     if (!nome || !telefone || !email) {
         alert("Preencha todos os campos.");
         return;
     }
 
-    const refClientes = db
-        .collection("empresas")
-        .doc(usuarioAtual.uid)
-        .collection("clientes");
+    const refClientes = db.collection("empresas").doc(usuarioAtual.uid).collection("clientes");
 
     try {
         if (clienteEditando) {
@@ -768,9 +972,9 @@ async function cadastrarCliente() {
 
         alert("Cliente salvo com sucesso!");
         clienteEditando = null;
-        if (nomeEl) nomeEl.value = "";
-        if (telefoneEl) telefoneEl.value = "";
-        if (emailEl) emailEl.value = "";
+        document.getElementById("nomeCliente").value = "";
+        document.getElementById("telefoneCliente").value = "";
+        document.getElementById("emailCliente").value = "";
 
         await carregarClientes();
         atualizarDashboard();
@@ -791,126 +995,72 @@ async function carregarClientes() {
             .get();
 
         clientesCache = [];
-        snapshot.forEach((doc) => {
-            clientesCache.push({ id: doc.id, ...doc.data() });
-        });
+        snapshot.forEach((doc) => clientesCache.push({ id: doc.id, ...doc.data() }));
 
         clientesCache.sort((a, b) =>
             (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" })
         );
 
         const totalElement = document.getElementById("totalClientes");
-        if (totalElement) {
-            totalElement.textContent = `${clientesCache.length} cadastrados`;
-        }
+        if (totalElement) totalElement.textContent = `${clientesCache.length} cadastrados`;
 
         atualizarSugestoesClientes();
         filtrarClientes();
     } catch (erro) {
         console.error("Erro ao carregar clientes:", erro);
-        alert("Erro ao carregar a lista de clientes.");
     }
 }
 
 function renderizarClientes(listaDados) {
     const lista = document.getElementById("listaClientes");
     if (!lista) return;
-
     lista.innerHTML = "";
 
     listaDados.forEach((cliente) => {
         const item = document.createElement("div");
         item.className = "cliente-item";
+        item.innerHTML = `
+            <strong>${escaparHTML(cliente.nome || "")}</strong>
+            <div>📞 ${escaparHTML(cliente.telefone || "")}</div>
+            <div>📧 ${escaparHTML(cliente.email || "")}</div>
+        `;
 
-        const strong = document.createElement("strong");
-        strong.textContent = cliente.nome || "";
-
-        const br1 = document.createElement("br");
-        const telLinha = document.createTextNode(`📞 ${cliente.telefone || ""}`);
-        const br2 = document.createElement("br");
-        const emailLinha = document.createTextNode(`📧 ${cliente.email || ""}`);
-        const br3 = document.createElement("br");
-        const br4 = document.createElement("br");
+        const acoes = document.createElement("div");
+        acoes.className = "acoes-card";
 
         const btnEditar = document.createElement("button");
         btnEditar.type = "button";
         btnEditar.className = "btn-secundario";
         btnEditar.textContent = "Editar";
         btnEditar.addEventListener("click", () => {
-            editarCliente(cliente.id, cliente.nome || "", cliente.telefone || "", cliente.email || "");
+            clienteEditando = cliente.id;
+            document.getElementById("nomeCliente").value = cliente.nome || "";
+            document.getElementById("telefoneCliente").value = cliente.telefone || "";
+            document.getElementById("emailCliente").value = cliente.email || "";
+            mostrarSecao("gestaoClientes");
         });
 
         const btnExcluir = document.createElement("button");
         btnExcluir.type = "button";
         btnExcluir.className = "btn-remover-linha";
-        btnExcluir.style.marginLeft = "8px";
         btnExcluir.textContent = "Excluir";
-        btnExcluir.addEventListener("click", () => {
-            excluirCliente(cliente.id);
+        btnExcluir.addEventListener("click", async () => {
+            if (!confirm("Deseja realmente excluir este cliente?")) return;
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("clientes").doc(cliente.id).delete();
+            if (clienteEditando === cliente.id) clienteEditando = null;
+            await carregarClientes();
+            atualizarDashboard();
         });
 
-        item.appendChild(strong);
-        item.appendChild(br1);
-        item.appendChild(telLinha);
-        item.appendChild(br2);
-        item.appendChild(emailLinha);
-        item.appendChild(br3);
-        item.appendChild(br4);
-        item.appendChild(btnEditar);
-        item.appendChild(btnExcluir);
-
+        acoes.appendChild(btnEditar);
+        acoes.appendChild(btnExcluir);
+        item.appendChild(acoes);
         lista.appendChild(item);
     });
 }
 
-async function excluirCliente(id) {
-    if (!usuarioAtual || !id) return;
-    if (!confirm("Deseja realmente excluir este cliente?")) return;
-
-    try {
-        await db
-            .collection("empresas")
-            .doc(usuarioAtual.uid)
-            .collection("clientes")
-            .doc(id)
-            .delete();
-
-        if (clienteEditando === id) {
-            clienteEditando = null;
-            const nomeEl = document.getElementById("nomeCliente");
-            const telefoneEl = document.getElementById("telefoneCliente");
-            const emailEl = document.getElementById("emailCliente");
-            if (nomeEl) nomeEl.value = "";
-            if (telefoneEl) telefoneEl.value = "";
-            if (emailEl) emailEl.value = "";
-        }
-
-        alert("Cliente excluído com sucesso!");
-        await carregarClientes();
-        atualizarDashboard();
-    } catch (erro) {
-        console.error("Erro ao excluir cliente:", erro);
-        alert("Erro ao excluir cliente.");
-    }
-}
-
-function editarCliente(id, nome, telefone, email) {
-    clienteEditando = id;
-    const nomeEl = document.getElementById("nomeCliente");
-    const telefoneEl = document.getElementById("telefoneCliente");
-    const emailEl = document.getElementById("emailCliente");
-
-    if (nomeEl) nomeEl.value = nome;
-    if (telefoneEl) telefoneEl.value = telefone;
-    if (emailEl) emailEl.value = email;
-
-    mostrarSecao("gestaoClientes");
-}
-
 function filtrarClientes() {
-    const buscaEl = document.getElementById("buscarCliente");
-    const texto = buscaEl ? buscaEl.value.toLowerCase().trim() : "";
-
+    const texto = document.getElementById("buscarCliente")?.value.toLowerCase().trim() || "";
     if (!texto) {
         renderizarClientes(clientesCache);
         return;
@@ -932,10 +1082,7 @@ function exportarClientesJSON() {
         telefone: telefone || "",
         email: email || ""
     }));
-
-    const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], {
-        type: "application/json"
-    });
+    const blob = new Blob([JSON.stringify(dadosExportacao, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -944,6 +1091,308 @@ function exportarClientesJSON() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+/* ==================== PORTFÓLIO DIGITAL & GALERIA ==================== */
+function comprimirImagemArquivo(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 700;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL("image/jpeg", 0.72));
+            };
+            img.onerror = reject;
+            img.src = reader.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function salvarItemPortfolio() {
+    if (!usuarioAtual) return;
+
+    const titulo = document.getElementById("portTitulo")?.value.trim() || "";
+    const categoria = document.getElementById("portCategoria")?.value || "Prestação de Serviço";
+    const urlInput = document.getElementById("portImagemUrl")?.value.trim() || "";
+    const arquivoInput = document.getElementById("portImagemArquivo");
+    const descricao = document.getElementById("portDescricao")?.value.trim() || "";
+
+    if (!titulo) {
+        alert("Informe o título do trabalho para o portfólio.");
+        return;
+    }
+
+    let imagem = urlInput;
+    if (arquivoInput && arquivoInput.files && arquivoInput.files[0]) {
+        imagem = await comprimirImagemArquivo(arquivoInput.files[0]);
+    } else if (!imagem && portfolioEditando) {
+        const existente = portfolioCache.find((p) => p.id === portfolioEditando);
+        imagem = existente?.imagem || "";
+    }
+
+    const refPortfolio = db.collection("empresas").doc(usuarioAtual.uid).collection("portfolio");
+    const payload = { titulo, categoria, imagem, descricao };
+
+    try {
+        if (portfolioEditando) {
+            await refPortfolio.doc(portfolioEditando).update({
+                ...payload,
+                atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            await refPortfolio.add({
+                ...payload,
+                criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        portfolioEditando = null;
+        document.getElementById("portTitulo").value = "";
+        document.getElementById("portImagemUrl").value = "";
+        if (arquivoInput) arquivoInput.value = "";
+        document.getElementById("portDescricao").value = "";
+        document.getElementById("btnSalvarPortfolio").textContent = "Publicar no Portfólio";
+
+        await carregarPortfolio();
+        atualizarDashboard();
+    } catch (erro) {
+        console.error("Erro ao salvar portfólio:", erro);
+        alert("Erro ao salvar item no portfólio.");
+    }
+}
+
+async function carregarPortfolio() {
+    if (!usuarioAtual) return;
+
+    try {
+        const snapshot = await db
+            .collection("empresas")
+            .doc(usuarioAtual.uid)
+            .collection("portfolio")
+            .get();
+
+        portfolioCache = [];
+        snapshot.forEach((doc) => portfolioCache.push({ id: doc.id, ...doc.data() }));
+
+        const badge = document.getElementById("totalPortfolioBadge");
+        if (badge) badge.textContent = `${portfolioCache.length} itens`;
+
+        renderizarPortfolio();
+    } catch (erro) {
+        console.error("Erro ao carregar portfólio:", erro);
+    }
+}
+
+function renderizarPortfolio() {
+    const lista = document.getElementById("listaPortfolio");
+    if (!lista) return;
+    lista.innerHTML = "";
+
+    if (portfolioCache.length === 0) {
+        lista.innerHTML = '<p class="texto-vazio">Nenhum trabalho publicado no portfólio ainda.</p>';
+        return;
+    }
+
+    portfolioCache.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "modulo-card";
+
+        const imgHtml = item.imagem
+            ? `<img src="${escaparHTML(item.imagem)}" alt="${escaparHTML(item.titulo)}" class="foto-portfolio">`
+            : "";
+
+        card.innerHTML = `
+            ${imgHtml}
+            <div class="card-topo">
+                <strong>${escaparHTML(item.titulo)}</strong>
+                <span class="status-pill">${escaparHTML(item.categoria || "Serviço")}</span>
+            </div>
+            <div>${escaparHTML(item.descricao || "")}</div>
+        `;
+
+        const acoes = document.createElement("div");
+        acoes.className = "acoes-card";
+
+        const btnDivulgar = document.createElement("button");
+        btnDivulgar.type = "button";
+        btnDivulgar.className = "btn-primario";
+        btnDivulgar.textContent = "Copiar p/ Redes";
+        btnDivulgar.addEventListener("click", () => {
+            const textoDivulgacao = `${item.titulo} (${item.categoria}) — ${item.descricao || "Confira este serviço!"}`;
+            navigator.clipboard?.writeText(textoDivulgacao);
+            alert("Texto de divulgação copiado para a área de transferência!");
+        });
+
+        const btnExcluir = document.createElement("button");
+        btnExcluir.type = "button";
+        btnExcluir.className = "btn-remover-linha";
+        btnExcluir.textContent = "Excluir";
+        btnExcluir.addEventListener("click", async () => {
+            if (!confirm("Remover este item do portfólio?")) return;
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("portfolio").doc(item.id).delete();
+            await carregarPortfolio();
+            atualizarDashboard();
+        });
+
+        acoes.appendChild(btnDivulgar);
+        acoes.appendChild(btnExcluir);
+        card.appendChild(acoes);
+        lista.appendChild(card);
+    });
+}
+
+/* ==================== VOUCHERS POR FIDELIDADE ==================== */
+async function salvarVoucher() {
+    if (!usuarioAtual) return;
+
+    const codigo = (document.getElementById("voucherCodigo")?.value.trim() || "").toUpperCase();
+    const tipo = document.getElementById("voucherTipo")?.value || "percentual";
+    const valor = Math.max(0, Number(document.getElementById("voucherValor")?.value) || 0);
+    const cliente = document.getElementById("voucherCliente")?.value.trim() || "Todos os clientes";
+    const descricao = document.getElementById("voucherDescricao")?.value.trim() || "Fidelidade";
+
+    if (!codigo || valor <= 0) {
+        alert("Informe um código e um valor de desconto maior que zero.");
+        return;
+    }
+
+    try {
+        await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").add({
+            codigo,
+            tipo,
+            valor,
+            cliente,
+            descricao,
+            status: "Disponível",
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        document.getElementById("voucherCodigo").value = "";
+        document.getElementById("voucherValor").value = "";
+        document.getElementById("voucherCliente").value = "";
+        document.getElementById("voucherDescricao").value = "";
+
+        await carregarVouchers();
+        atualizarDashboard();
+    } catch (erro) {
+        console.error("Erro ao salvar voucher:", erro);
+        alert("Erro ao criar voucher.");
+    }
+}
+
+async function carregarVouchers() {
+    if (!usuarioAtual) return;
+
+    try {
+        const snapshot = await db
+            .collection("empresas")
+            .doc(usuarioAtual.uid)
+            .collection("vouchers")
+            .get();
+
+        vouchersCache = [];
+        snapshot.forEach((doc) => vouchersCache.push({ id: doc.id, ...doc.data() }));
+
+        const badge = document.getElementById("totalVouchersBadge");
+        if (badge) badge.textContent = `${vouchersCache.length} vouchers`;
+
+        renderizarVouchers();
+    } catch (erro) {
+        console.error("Erro ao carregar vouchers:", erro);
+    }
+}
+
+function renderizarVouchers() {
+    const lista = document.getElementById("listaVouchers");
+    if (!lista) return;
+    lista.innerHTML = "";
+
+    if (vouchersCache.length === 0) {
+        lista.innerHTML = '<p class="texto-vazio">Nenhum voucher de fidelidade cadastrado.</p>';
+        return;
+    }
+
+    vouchersCache.forEach((v) => {
+        const card = document.createElement("div");
+        card.className = "modulo-card";
+        const beneficioTexto = v.tipo === "percentual" ? `${v.valor}% OFF` : formatarMoeda(v.valor);
+        const classeStatus = v.status === "Resgatado" ? "status-resgatado" : "status-disponivel";
+
+        card.innerHTML = `
+            <div class="card-topo">
+                <strong>🎟 ${escaparHTML(v.codigo)}</strong>
+                <span class="status-pill ${classeStatus}">${escaparHTML(v.status || "Disponível")}</span>
+            </div>
+            <div>Benefício: <strong>${escaparHTML(beneficioTexto)}</strong></div>
+            <div>Cliente: ${escaparHTML(v.cliente || "Todos os clientes")}</div>
+            <div>${escaparHTML(v.descricao || "")}</div>
+        `;
+
+        const acoes = document.createElement("div");
+        acoes.className = "acoes-card";
+
+        const btnAplicar = document.createElement("button");
+        btnAplicar.type = "button";
+        btnAplicar.className = "btn-primario";
+        btnAplicar.textContent = "Aplicar no Orçamento";
+        btnAplicar.addEventListener("click", () => {
+            const { subtotalItens } = recalcularTotaisPlanilha();
+            const descontoCalculado = v.tipo === "percentual"
+                ? (subtotalItens * (Number(v.valor) || 0)) / 100
+                : Number(v.valor) || 0;
+            document.getElementById("orcDesconto").value = descontoCalculado.toFixed(2);
+            recalcularTotaisPlanilha();
+            mostrarSecao("planilhaOrcamentaria");
+        });
+
+        const btnStatus = document.createElement("button");
+        btnStatus.type = "button";
+        btnStatus.className = "btn-secundario";
+        btnStatus.textContent = v.status === "Resgatado" ? "Marcar Disponível" : "Marcar Resgatado";
+        btnStatus.addEventListener("click", async () => {
+            const novoStatus = v.status === "Resgatado" ? "Disponível" : "Resgatado";
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").doc(v.id).update({
+                status: novoStatus
+            });
+            await carregarVouchers();
+        });
+
+        const btnExcluir = document.createElement("button");
+        btnExcluir.type = "button";
+        btnExcluir.className = "btn-remover-linha";
+        btnExcluir.textContent = "Excluir";
+        btnExcluir.addEventListener("click", async () => {
+            if (!confirm("Excluir este voucher?")) return;
+            await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").doc(v.id).delete();
+            await carregarVouchers();
+            atualizarDashboard();
+        });
+
+        acoes.appendChild(btnAplicar);
+        acoes.appendChild(btnStatus);
+        acoes.appendChild(btnExcluir);
+        card.appendChild(acoes);
+        lista.appendChild(card);
+    });
 }
 
 function mostrarSecao(id) {
