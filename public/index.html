@@ -15,6 +15,28 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
 </head>
 <body>
+    <!-- Tela Pública de Agendamento do Cliente Final -->
+    <div id="agendamentoPublicoOverlay" class="overlay" style="display: none;">
+        <div class="login-card agendamento-publico-card">
+            <div class="logo-box login-logo">📅</div>
+            <h1 id="pubNomeEmpresa">Agendamento Online</h1>
+            <p class="subtitulo-login">Escolha o serviço, a data e o melhor horário para você</p>
+
+            <div class="form-publico">
+                <input type="text" id="pubClienteNome" placeholder="Seu nome completo">
+                <input type="text" id="pubClienteTelefone" placeholder="Seu WhatsApp / Telefone">
+                <input type="text" id="pubServico" placeholder="Serviço desejado (ex.: Corte, Banho Pet, Aula)">
+                <div class="grid-duas-colunas-compacta">
+                    <input type="date" id="pubData">
+                    <input type="time" id="pubHora">
+                </div>
+                <input type="text" id="pubObservacao" placeholder="Observação (opcional)">
+                <button type="button" class="btn-primario" onclick="enviarAgendamentoPublico()">Confirmar Agendamento</button>
+                <p id="pubMensagem" class="mensagem-sucesso"></p>
+            </div>
+        </div>
+    </div>
+
     <!-- Tela de Login -->
     <div id="loginOverlay" class="overlay" style="display: none;">
         <div class="login-card">
@@ -66,6 +88,8 @@
             <nav class="menu-nav">
                 <button type="button" class="nav-btn" onclick="mostrarSecao('dashboardSecao')">📊 Dashboard</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('planilhaOrcamentaria')">📋 Planilha Orçamentária</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('agendaClientes')" id="navAgendaBtn">📅 Agenda (Standard/Premium)</button>
+                <button type="button" class="nav-btn" onclick="mostrarSecao('assistentePremium')" id="navPremiumBtn">🤖 Balanço & Lembretes (Premium)</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('planosServicos')">📦 Planos (Básico / Standard / Premium)</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('gestaoClientes')">👥 Clientes</button>
                 <button type="button" class="nav-btn" onclick="mostrarSecao('portfolioDigital')">🖼 Portfólio & Galeria</button>
@@ -137,6 +161,68 @@
                         <div id="resumoUltimosClientes" class="lista-resumo">
                             <p class="texto-vazio">Nenhum cliente cadastrado ainda.</p>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AGENDA & INTEGRAÇÃO CLIENTE FINAL (STANDARD E PREMIUM) -->
+            <section id="agendaClientes" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Agenda & Integração com Cliente Final <span class="status-pill">Standard / Premium</span></h2>
+                        <p class="descricao-secao">Compartilhe seu link de agendamento para o cliente marcar horário direto pelo celular</p>
+                    </div>
+                    <button type="button" class="btn-primario" onclick="copiarLinkAgendamento()">🔗 Copiar Link de Agendamento</button>
+                </div>
+
+                <div id="agendaBloqueadaAviso" class="aviso-plano" style="display: none;">
+                    Recurso exclusivo dos planos <strong>Standard</strong> e <strong>Premium</strong>. Altere o nível do plano em Configurações para liberar.
+                </div>
+
+                <div id="agendaConteudo">
+                    <div class="grid-form-agenda">
+                        <input type="text" id="agClienteNome" list="sugestoesClientes" placeholder="Nome do cliente">
+                        <input type="text" id="agClienteTelefone" placeholder="WhatsApp / Telefone">
+                        <input type="text" id="agServico" placeholder="Serviço (ex.: Corte, Banho Pet, Aula)">
+                        <input type="date" id="agData">
+                        <input type="time" id="agHora">
+                        <button type="button" class="btn-primario" onclick="salvarAgendamentoManual()">+ Agendar Horário</button>
+                    </div>
+
+                    <hr class="divisor">
+
+                    <div class="cabecalho-lista">
+                        <h3>Horários Agendados</h3>
+                        <span id="totalAgendamentosBadge" class="badge-contagem">0 agendamentos</span>
+                    </div>
+
+                    <div id="listaAgendamentos" class="lista-cards"></div>
+                </div>
+            </section>
+
+            <!-- ASSISTENTE AUTOMÁTICO DE BALANÇO & LEMBRETES (PREMIUM) -->
+            <section id="assistentePremium" class="secao-card">
+                <div class="cabecalho-secao">
+                    <div>
+                        <h2>Balanço Automático & Lembretes Inteligentes <span class="status-pill status-aprovado">Premium</span></h2>
+                        <p class="descricao-secao">Relatório diário automático, alerta de clientes inativos (+15 dias) e sugestões de postagem</p>
+                    </div>
+                    <button type="button" class="btn-primario" onclick="copiarBalancoDiario()">📋 Copiar Balanço do Dia</button>
+                </div>
+
+                <div id="premiumBloqueadoAviso" class="aviso-plano" style="display: none;">
+                    Recurso exclusivo do plano <strong>Premium</strong>. Altere o nível do plano em Configurações para liberar.
+                </div>
+
+                <div id="premiumConteudo" class="grid-duas-colunas">
+                    <div class="subcard">
+                        <h3>📈 Resumo Diário Automático</h3>
+                        <div id="boxBalancoDiario" class="lista-resumo"></div>
+                    </div>
+
+                    <div class="subcard">
+                        <h3>⏰ Clientes Inativos (+15 dias) & Redes Sociais</h3>
+                        <div id="boxLembretesPremium" class="lista-resumo"></div>
                     </div>
                 </div>
             </section>
@@ -363,15 +449,20 @@
             <section id="configEmpresa" class="secao-card">
                 <div class="cabecalho-secao">
                     <div>
-                        <h2>Identidade da Empresa</h2>
-                        <p class="descricao-secao">Personalize o nome e o subtítulo exibidos no sistema</p>
+                        <h2>Identidade & Plano da Empresa</h2>
+                        <p class="descricao-secao">Personalize o nome, subtítulo e o nível de plano ativo (Básico, Standard ou Premium)</p>
                     </div>
                 </div>
 
                 <div class="grid-config">
                     <input type="text" id="inputNomeEmpresa" placeholder="Nome da empresa">
                     <input type="text" id="inputSubtituloEmpresa" placeholder="Subtítulo da empresa">
-                    <button type="button" class="btn-primario" onclick="salvarConfiguracoesEmpresa()">Salvar Identidade</button>
+                    <select id="selectNivelPlanoEmpresa">
+                        <option value="basico">Plano Básico (Essencial)</option>
+                        <option value="standard">Plano Standard (+ Agenda Cliente Final)</option>
+                        <option value="premium">Plano Premium (+ Agenda + Balanço & Lembretes)</option>
+                    </select>
+                    <button type="button" class="btn-primario" onclick="salvarConfiguracoesEmpresa()">Salvar Configurações</button>
                 </div>
             </section>
         </main>
