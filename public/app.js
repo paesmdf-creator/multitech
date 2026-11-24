@@ -20,27 +20,28 @@ if (typeof firebase.analytics === "function") {
 const PRAZO_DIAS_ASSINATURA = 30;
 const MS_POR_DIA = 1000 * 60 * 60 * 24;
 
+// Faixa de entrada acessível: Básico R$ 99,00 | Standard R$ 199,00 | Premium R$ 397,00
 const PLANOS_PADRAO_TIERS = [
     {
         nome: "Plano Básico",
         nivel: "Básico",
-        valor: 197.0,
+        valor: 99.0,
         periodicidade: "Mensal",
-        descricao: "Cadastro base, planilha orçamentária essencial e atendimento padrão."
+        descricao: "Entrada acessível com cadastro base, planilha orçamentária essencial e atendimento padrão."
     },
     {
         nome: "Plano Standard",
         nivel: "Standard",
-        valor: 347.0,
+        valor: 199.0,
         periodicidade: "Mensal",
-        descricao: "Gestão completa de orçamentos, portfólio de divulgação e vouchers de fidelidade."
+        descricao: "Gestão de orçamentos, portfólio de divulgação e vouchers de fidelidade com ótimo custo-benefício."
     },
     {
         nome: "Plano Premium",
         nivel: "Premium",
-        valor: 597.0,
+        valor: 397.0,
         periodicidade: "Mensal",
-        descricao: "Pacote completo com prioridade de atendimento, planos avançados e destaque na vitrine."
+        descricao: "Pacote completo com atendimento prioritário, destaque na vitrine e vantagens exclusivas."
     }
 ];
 
@@ -66,6 +67,22 @@ if ("serviceWorker" in navigator) {
             console.error("Erro ao registrar Service Worker:", err);
         });
     });
+}
+
+function atualizarStatusNuvem(estado, mensagemCustomizada = "") {
+    const el = document.getElementById("statusNuvem");
+    if (!el) return;
+
+    if (estado === "sincronizando") {
+        el.textContent = mensagemCustomizada || "☁ Sincronizando com a nuvem...";
+        el.dataset.estado = "sincronizando";
+    } else if (estado === "erro") {
+        el.textContent = mensagemCustomizada || "☁ Erro ao sincronizar";
+        el.dataset.estado = "erro";
+    } else {
+        el.textContent = mensagemCustomizada || "☁ Nuvem sincronizada";
+        el.dataset.estado = "sincronizado";
+    }
 }
 
 function formatarMoeda(valor) {
@@ -144,6 +161,7 @@ auth.onAuthStateChanged(async (user) => {
 
     usuarioAtual = user;
     if (loginOverlay) loginOverlay.style.display = "none";
+    atualizarStatusNuvem("sincronizando");
 
     try {
         const empresaRef = db.collection("empresas").doc(user.uid);
@@ -200,6 +218,7 @@ auth.onAuthStateChanged(async (user) => {
         if (statusAssinaturaAtual !== "ativa" && statusAssinaturaAtual !== "vitalicio") {
             if (bloqueioOverlay) bloqueioOverlay.style.display = "flex";
             if (appLayout) appLayout.style.display = "none";
+            atualizarStatusNuvem("sincronizado");
             return;
         }
 
@@ -218,8 +237,10 @@ auth.onAuthStateChanged(async (user) => {
             carregarVouchers()
         ]);
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao validar empresa:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao conectar ao banco de dados. Verifique o Firestore e suas regras.");
     }
 });
@@ -285,15 +306,18 @@ async function salvarConfiguracoesEmpresa() {
         ? inputSub.value.trim()
         : "Gestão Inteligente para Pequenos Negócios";
 
+    atualizarStatusNuvem("sincronizando");
     try {
         await db.collection("empresas").doc(usuarioAtual.uid).set(
             { nome, subtitulo },
             { merge: true }
         );
         aplicarIdentidade(nome, subtitulo);
+        atualizarStatusNuvem("sincronizado");
         alert("Identidade da empresa salva com sucesso!");
     } catch (erro) {
         console.error("Erro ao salvar configurações:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao salvar configurações da empresa.");
     }
 }
@@ -376,8 +400,9 @@ function renderizarResumoDashboard() {
 /* ==================== PLANOS (BÁSICO / STANDARD / PREMIUM) ==================== */
 async function restaurarPlanosPadrao() {
     if (!usuarioAtual) return;
-    if (!confirm("Adicionar os planos padrão Básico, Standard e Premium na sua lista?")) return;
+    if (!confirm("Adicionar os planos da faixa de entrada acessível (R$ 99 / R$ 199 / R$ 397)?")) return;
 
+    atualizarStatusNuvem("sincronizando");
     const refPlanos = db.collection("empresas").doc(usuarioAtual.uid).collection("planos");
     try {
         for (const p of PLANOS_PADRAO_TIERS) {
@@ -388,9 +413,11 @@ async function restaurarPlanosPadrao() {
         }
         await carregarPlanos();
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
         alert("Planos Básico, Standard e Premium adicionados!");
     } catch (erro) {
         console.error("Erro ao criar planos padrão:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao criar planos padrão.");
     }
 }
@@ -409,6 +436,7 @@ async function salvarPlano() {
         return;
     }
 
+    atualizarStatusNuvem("sincronizando");
     const refPlanos = db.collection("empresas").doc(usuarioAtual.uid).collection("planos");
     const payload = { nome, nivel, valor, periodicidade, descricao };
 
@@ -434,8 +462,10 @@ async function salvarPlano() {
 
         await carregarPlanos();
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar plano:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao salvar plano.");
     }
 }
@@ -471,6 +501,7 @@ async function carregarPlanos() {
         renderizarPlanos();
     } catch (erro) {
         console.error("Erro ao carregar planos:", erro);
+        atualizarStatusNuvem("erro");
     }
 }
 
@@ -581,9 +612,15 @@ function renderizarPlanos() {
         btnExcluir.textContent = "Excluir";
         btnExcluir.addEventListener("click", async () => {
             if (!confirm("Excluir este plano?")) return;
-            await db.collection("empresas").doc(usuarioAtual.uid).collection("planos").doc(plano.id).delete();
-            await carregarPlanos();
-            atualizarDashboard();
+            atualizarStatusNuvem("sincronizando");
+            try {
+                await db.collection("empresas").doc(usuarioAtual.uid).collection("planos").doc(plano.id).delete();
+                await carregarPlanos();
+                atualizarDashboard();
+                atualizarStatusNuvem("sincronizado");
+            } catch (erro) {
+                atualizarStatusNuvem("erro");
+            }
         });
 
         acoes.appendChild(btnOrc);
@@ -763,6 +800,7 @@ async function salvarOrcamento() {
         return;
     }
 
+    atualizarStatusNuvem("sincronizando");
     const refOrcamentos = db.collection("empresas").doc(usuarioAtual.uid).collection("orcamentos");
     const payload = { titulo, clienteNome, status, itens, subtotalItens, desconto, totalGeral };
 
@@ -783,8 +821,10 @@ async function salvarOrcamento() {
         limparFormularioOrcamento();
         await carregarOrcamentos();
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar orçamento:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao salvar orçamento na nuvem.");
     }
 }
@@ -814,6 +854,7 @@ async function carregarOrcamentos() {
         filtrarOrcamentos();
     } catch (erro) {
         console.error("Erro ao carregar orçamentos:", erro);
+        atualizarStatusNuvem("erro");
     }
 }
 
@@ -880,10 +921,16 @@ function renderizarOrcamentos(listaDados) {
         btnExcluir.textContent = "Excluir";
         btnExcluir.addEventListener("click", async () => {
             if (!confirm("Excluir este orçamento?")) return;
-            await db.collection("empresas").doc(usuarioAtual.uid).collection("orcamentos").doc(orc.id).delete();
-            if (orcamentoEditando === orc.id) limparFormularioOrcamento();
-            await carregarOrcamentos();
-            atualizarDashboard();
+            atualizarStatusNuvem("sincronizando");
+            try {
+                await db.collection("empresas").doc(usuarioAtual.uid).collection("orcamentos").doc(orc.id).delete();
+                if (orcamentoEditando === orc.id) limparFormularioOrcamento();
+                await carregarOrcamentos();
+                atualizarDashboard();
+                atualizarStatusNuvem("sincronizado");
+            } catch (erro) {
+                atualizarStatusNuvem("erro");
+            }
         });
 
         acoes.appendChild(btnEditar);
@@ -951,6 +998,7 @@ async function cadastrarCliente() {
         return;
     }
 
+    atualizarStatusNuvem("sincronizando");
     const refClientes = db.collection("empresas").doc(usuarioAtual.uid).collection("clientes");
 
     try {
@@ -978,8 +1026,10 @@ async function cadastrarCliente() {
 
         await carregarClientes();
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar cliente:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao salvar cliente na nuvem.");
     }
 }
@@ -1008,6 +1058,7 @@ async function carregarClientes() {
         filtrarClientes();
     } catch (erro) {
         console.error("Erro ao carregar clientes:", erro);
+        atualizarStatusNuvem("erro");
     }
 }
 
@@ -1046,10 +1097,16 @@ function renderizarClientes(listaDados) {
         btnExcluir.textContent = "Excluir";
         btnExcluir.addEventListener("click", async () => {
             if (!confirm("Deseja realmente excluir este cliente?")) return;
-            await db.collection("empresas").doc(usuarioAtual.uid).collection("clientes").doc(cliente.id).delete();
-            if (clienteEditando === cliente.id) clienteEditando = null;
-            await carregarClientes();
-            atualizarDashboard();
+            atualizarStatusNuvem("sincronizando");
+            try {
+                await db.collection("empresas").doc(usuarioAtual.uid).collection("clientes").doc(cliente.id).delete();
+                if (clienteEditando === cliente.id) clienteEditando = null;
+                await carregarClientes();
+                atualizarDashboard();
+                atualizarStatusNuvem("sincronizado");
+            } catch (erro) {
+                atualizarStatusNuvem("erro");
+            }
         });
 
         acoes.appendChild(btnEditar);
@@ -1141,6 +1198,7 @@ async function salvarItemPortfolio() {
         return;
     }
 
+    atualizarStatusNuvem("sincronizando");
     let imagem = urlInput;
     if (arquivoInput && arquivoInput.files && arquivoInput.files[0]) {
         imagem = await comprimirImagemArquivo(arquivoInput.files[0]);
@@ -1174,8 +1232,10 @@ async function salvarItemPortfolio() {
 
         await carregarPortfolio();
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar portfólio:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao salvar item no portfólio.");
     }
 }
@@ -1199,6 +1259,7 @@ async function carregarPortfolio() {
         renderizarPortfolio();
     } catch (erro) {
         console.error("Erro ao carregar portfólio:", erro);
+        atualizarStatusNuvem("erro");
     }
 }
 
@@ -1248,9 +1309,15 @@ function renderizarPortfolio() {
         btnExcluir.textContent = "Excluir";
         btnExcluir.addEventListener("click", async () => {
             if (!confirm("Remover este item do portfólio?")) return;
-            await db.collection("empresas").doc(usuarioAtual.uid).collection("portfolio").doc(item.id).delete();
-            await carregarPortfolio();
-            atualizarDashboard();
+            atualizarStatusNuvem("sincronizando");
+            try {
+                await db.collection("empresas").doc(usuarioAtual.uid).collection("portfolio").doc(item.id).delete();
+                await carregarPortfolio();
+                atualizarDashboard();
+                atualizarStatusNuvem("sincronizado");
+            } catch (erro) {
+                atualizarStatusNuvem("erro");
+            }
         });
 
         acoes.appendChild(btnDivulgar);
@@ -1275,6 +1342,7 @@ async function salvarVoucher() {
         return;
     }
 
+    atualizarStatusNuvem("sincronizando");
     try {
         await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").add({
             codigo,
@@ -1293,8 +1361,10 @@ async function salvarVoucher() {
 
         await carregarVouchers();
         atualizarDashboard();
+        atualizarStatusNuvem("sincronizado");
     } catch (erro) {
         console.error("Erro ao salvar voucher:", erro);
+        atualizarStatusNuvem("erro");
         alert("Erro ao criar voucher.");
     }
 }
@@ -1318,6 +1388,7 @@ async function carregarVouchers() {
         renderizarVouchers();
     } catch (erro) {
         console.error("Erro ao carregar vouchers:", erro);
+        atualizarStatusNuvem("erro");
     }
 }
 
@@ -1370,10 +1441,16 @@ function renderizarVouchers() {
         btnStatus.textContent = v.status === "Resgatado" ? "Marcar Disponível" : "Marcar Resgatado";
         btnStatus.addEventListener("click", async () => {
             const novoStatus = v.status === "Resgatado" ? "Disponível" : "Resgatado";
-            await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").doc(v.id).update({
-                status: novoStatus
-            });
-            await carregarVouchers();
+            atualizarStatusNuvem("sincronizando");
+            try {
+                await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").doc(v.id).update({
+                    status: novoStatus
+                });
+                await carregarVouchers();
+                atualizarStatusNuvem("sincronizado");
+            } catch (erro) {
+                atualizarStatusNuvem("erro");
+            }
         });
 
         const btnExcluir = document.createElement("button");
@@ -1382,9 +1459,15 @@ function renderizarVouchers() {
         btnExcluir.textContent = "Excluir";
         btnExcluir.addEventListener("click", async () => {
             if (!confirm("Excluir este voucher?")) return;
-            await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").doc(v.id).delete();
-            await carregarVouchers();
-            atualizarDashboard();
+            atualizarStatusNuvem("sincronizando");
+            try {
+                await db.collection("empresas").doc(usuarioAtual.uid).collection("vouchers").doc(v.id).delete();
+                await carregarVouchers();
+                atualizarDashboard();
+                atualizarStatusNuvem("sincronizado");
+            } catch (erro) {
+                atualizarStatusNuvem("erro");
+            }
         });
 
         acoes.appendChild(btnAplicar);
