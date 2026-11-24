@@ -1,18 +1,15 @@
 {
-  "name": "multitech",
-  "version": "1.0.0",
-  "description": "Sistema MultiTech",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "sqlite3": "^6.0.1"
-  }
+  "name": "MultiTech - Gestão para Pequenos Negócios",
+  "short_name": "MultiTech",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ede0d4",
+  "theme_color": "#8c5a37",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
