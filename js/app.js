@@ -25,8 +25,8 @@ import {
   obterPlano,
   aplicarPermissoesNaInterface
 } from "./planos-permissoes.js";
-import { GerenciadorOperadores } from "./operadores.js";
-import { renderizarVitrinePlanos } from "./vitrine-planos.js";
+import { GerenciadorOperadores } from "./operadore.js";
+import { renderizarVitrinePlanos } from "./vitrine-plano.js";
 
 let empresaUidAtual = null;
 let dadosEmpresaAtual = null;
@@ -162,6 +162,24 @@ document.getElementById("btn-toggle-menu").addEventListener("click", () => {
   document.getElementById("sidebar").classList.toggle("open");
 });
 
+function renderizarVitrineLogada(planoAtual) {
+  renderizarVitrinePlanos("vitrine-planos-logada", {
+    planoAtual,
+    onSelecionarPlano: async (planoId) => {
+      await updateDoc(doc(db, "empresas", empresaUidAtual), {
+        plano: planoId,
+        atualizadoEm: serverTimestamp()
+      });
+      await carregarDadosEmpresa();
+      gerenciadorOperadores.plano = obterPlano(planoId);
+      gerenciadorOperadores.renderizarTabelaOperadores();
+      aplicarPermissoesNaInterface(planoId, gerenciadorOperadores.operadorAtivo);
+      renderizarVitrineLogada(planoId);
+      alert(`Plano alterado para ${PLANOS_MULTITECH[planoId].nome}!`);
+    }
+  });
+}
+
 // Observa sessão da empresa no Firebase Auth
 onAuthStateChanged(auth, async (user) => {
   const authScreen = document.getElementById("auth-screen");
@@ -185,24 +203,7 @@ onAuthStateChanged(auth, async (user) => {
   gerenciadorOperadores = new GerenciadorOperadores(db, empresaUidAtual, dadosEmpresaAtual.plano);
   await gerenciadorOperadores.iniciar();
 
-  renderizarVitrinePlanos("vitrine-planos-logada", {
-    planoAtual: dadosEmpresaAtual.plano,
-    onSelecionarPlano: async (planoId) => {
-      await updateDoc(doc(db, "empresas", empresaUidAtual), {
-        plano: planoId,
-        atualizadoEm: serverTimestamp()
-      });
-      await carregarDadosEmpresa();
-      gerenciadorOperadores.plano = obterPlano(planoId);
-      gerenciadorOperadores.renderizarTabelaOperadores();
-      aplicarPermissoesNaInterface(planoId, gerenciadorOperadores.operadorAtivo);
-      renderizarVitrinePlanos("vitrine-planos-logada", {
-        planoAtual: planoId,
-        onSelecionarPlano: arguments.callee
-      });
-      alert(`Plano alterado para ${PLANOS_MULTITECH[planoId].nome}!`);
-    }
-  });
+  renderizarVitrineLogada(dadosEmpresaAtual.plano);
 
   await atualizarTodosDados();
 });
