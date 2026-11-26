@@ -1,1 +1,23 @@
-
+{
+  "name": "Multitech — Gestão Empresarial",
+  "short_name": "Multitech",
+  "description": "Sistema PWA de gestão empresarial com multiusuário interno e planos escaláveis.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/0f172a/ffffff?text=MT",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/0f172a/ffffff?text=MT",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
