@@ -1,473 +1,377 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MULTITECH - Sistema de Gestão</title>
-    <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#5c3a21">
-    <link rel="stylesheet" href="./style.css">
-
-    <!-- Firebase Compat SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multitech — Gestão Empresarial</title>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-    <!-- Tela Pública de Agendamento do Cliente Final -->
-    <div id="agendamentoPublicoOverlay" class="overlay" style="display: none;">
-        <div class="login-card agendamento-publico-card">
-            <div class="logo-box login-logo">📅</div>
-            <h1 id="pubNomeEmpresa">Agendamento Online</h1>
-            <p class="subtitulo-login">Escolha o serviço, a data e o melhor horário para você</p>
+  <!-- TELA DE LOGIN / CADASTRO DA EMPRESA (FIREBASE AUTH) -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-logo">MT</div>
+        <div>
+          <h1 id="auth-brand-title">Multitech</h1>
+          <p id="auth-brand-sub">Sistema de gestão para pequenos negócios e equipes</p>
+        </div>
+      </div>
 
-            <div class="form-publico">
-                <input type="text" id="pubClienteNome" placeholder="Seu nome completo">
-                <input type="text" id="pubClienteTelefone" placeholder="Seu WhatsApp / Telefone">
-                <input type="text" id="pubServico" placeholder="Serviço desejado (ex.: Corte, Banho Pet, Aula)">
-                <div class="grid-duas-colunas-compacta">
-                    <input type="date" id="pubData">
-                    <input type="time" id="pubHora">
-                </div>
-                <input type="text" id="pubObservacao" placeholder="Observação (opcional)">
-                <button type="button" class="btn-primario" onclick="enviarAgendamentoPublico()">Confirmar Agendamento</button>
-                <p id="pubMensagem" class="mensagem-sucesso"></p>
+      <div class="auth-tabs">
+        <button type="button" id="tab-login" class="auth-tab active">Entrar</button>
+        <button type="button" id="tab-register" class="auth-tab">Criar Conta</button>
+        <button type="button" id="tab-plans-public" class="auth-tab">Ver Planos</button>
+      </div>
+
+      <form id="auth-form" class="auth-form">
+        <div id="campo-nome-empresa" class="form-group hidden">
+          <label for="auth-empresa">Nome da Empresa</label>
+          <input type="text" id="auth-empresa" placeholder="Ex: Studio Silva" />
+        </div>
+
+        <div id="campo-plano-inicial" class="form-group hidden">
+          <label for="auth-plano">Plano Inicial</label>
+          <select id="auth-plano">
+            <option value="starter">Starter — R$ 39,90/mês</option>
+            <option value="profissional">Profissional — R$ 59,90/mês</option>
+            <option value="empresarial">Empresarial — R$ 89,90/mês</option>
+            <option value="premium">Premium — R$ 129,90/mês</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="auth-email">E-mail da Empresa</label>
+          <input type="email" id="auth-email" required placeholder="contato@empresa.com" />
+        </div>
+
+        <div class="form-group">
+          <label for="auth-password">Senha</label>
+          <input type="password" id="auth-password" required placeholder="••••••••" />
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary full-width">Acessar Sistema</button>
+        <p id="auth-error" class="error-text"></p>
+      </form>
+
+      <div id="public-plans-view" class="hidden">
+        <p class="muted-text">Confira as especificações completas de cada plano antes de contratar:</p>
+        <div id="vitrine-planos-publica" class="planos-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APLICAÇÃO PRINCIPAL (APÓS LOGIN DA EMPRESA) -->
+  <div id="app-shell" class="app-shell hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-logo small">MT</div>
+        <div>
+          <strong id="empresa-nome-sidebar">Multitech</strong>
+          <small id="empresa-plano-sidebar">Plano Starter</small>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button type="button" class="nav-item active" data-view="dashboard" data-modulo="clientes">
+          <span>📊</span> Dashboard
+        </button>
+        <button type="button" class="nav-item" data-view="clientes" data-modulo="clientes">
+          <span>👥</span> Clientes
+        </button>
+        <button type="button" class="nav-item" data-view="servicos" data-modulo="servicos">
+          <span>🛠️</span> Serviços
+        </button>
+        <button type="button" class="nav-item" data-view="agenda" data-modulo="agenda">
+          <span>📅</span> Agenda
+        </button>
+        <button type="button" class="nav-item" data-view="portfolio" data-modulo="portfolio">
+          <span>🖼️</span> Portfólio & Página
+        </button>
+        <button type="button" class="nav-item" data-view="financeiro" data-modulo="financeiro_basico">
+          <span>💰</span> Financeiro
+        </button>
+        <button type="button" class="nav-item" data-view="relatorios" data-modulo="relatorios_financeiros">
+          <span>📈</span> Relatórios
+        </button>
+        <button type="button" class="nav-item" data-view="equipe" data-modulo="gestao_usuarios">
+          <span>🔐</span> Equipe e Perfis
+        </button>
+        <button type="button" class="nav-item" data-view="planos" data-modulo="clientes">
+          <span>💎</span> Planos
+        </button>
+        <button type="button" class="nav-item" data-view="configuracoes" data-modulo="clientes">
+          <span>⚙️</span> Configurações
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button type="button" id="btn-logout-empresa" class="btn btn-outline full-width">Sair da Conta</button>
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" id="btn-toggle-menu" class="icon-btn">☰</button>
+          <h2 id="page-title">Dashboard</h2>
+        </div>
+
+        <div class="topbar-right">
+          <span id="mt-operador-atual-badge" class="operador-badge">Carregando...</span>
+          <button type="button" id="mt-btn-trocar-operador" class="btn btn-secondary btn-sm hidden">
+            Trocar operador
+          </button>
+        </div>
+      </header>
+
+      <main class="content-area">
+        <!-- VIEW: DASHBOARD -->
+        <section id="view-dashboard" class="view-section active">
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <span>Clientes cadastrados</span>
+              <strong id="kpi-clientes">0</strong>
             </div>
-        </div>
-    </div>
+            <div class="kpi-card">
+              <span>Atendimentos na agenda</span>
+              <strong id="kpi-agenda">0</strong>
+            </div>
+            <div class="kpi-card" data-modulo="financeiro_basico">
+              <span>Entradas</span>
+              <strong id="kpi-entradas">R$ 0,00</strong>
+            </div>
+            <div class="kpi-card" data-modulo="financeiro_basico">
+              <span>Saldo</span>
+              <strong id="kpi-saldo">R$ 0,00</strong>
+            </div>
+          </div>
 
-    <!-- Tela de Login -->
-    <div id="loginOverlay" class="overlay" style="display: none;">
-        <div class="login-card">
-            <div class="logo-box login-logo">M</div>
-            <h1>MULTITECH</h1>
-            <p class="subtitulo-login">Acesso ao Sistema de Gestão</p>
-
-            <input type="email" id="loginEmail" placeholder="E-mail de acesso" autocomplete="username">
-            <input type="password" id="loginSenha" placeholder="Senha" autocomplete="current-password">
-            <button type="button" id="btnEntrar" onclick="fazerLogin()">Entrar no Sistema</button>
-            <p id="loginErro" class="mensagem-erro"></p>
-        </div>
-    </div>
-
-    <!-- Tela de Bloqueio por Assinatura / Prazo -->
-    <div id="bloqueioOverlay" class="overlay" style="display: none;">
-        <div class="login-card bloqueio-card">
-            <div class="logo-box bloqueio-icone">!</div>
-            <h2>Acesso Suspenso</h2>
-            <p class="subtitulo-login">
-                O prazo de 30 dias corridos encerrou ou há pendência na assinatura desta empresa.
+          <div class="card">
+            <h3>Resumo operacional</h3>
+            <p id="resumo-operacional-texto" class="muted-text">
+              Acompanhe os registros da empresa e os lançamentos por usuário interno.
             </p>
-            <p class="texto-apoio">
-                Entre em contato com o suporte para confirmar o pagamento e reativar o sistema.
+            <div id="dashboard-ultimos-atendimentos"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: CLIENTES -->
+        <section id="view-clientes" class="view-section hidden" data-modulo="clientes">
+          <div class="card">
+            <h3>Novo Cliente</h3>
+            <form id="form-cliente" class="grid-form">
+              <input type="text" id="cliente-nome" placeholder="Nome completo" required />
+              <input type="text" id="cliente-telefone" placeholder="Telefone / WhatsApp" required />
+              <input type="email" id="cliente-email" placeholder="E-mail (opcional)" />
+              <input type="text" id="cliente-observacoes" placeholder="Observações / histórico inicial" />
+              <button type="submit" class="btn btn-primary">Salvar Cliente</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Lista de Clientes</h3>
+            <div id="lista-clientes" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: SERVIÇOS -->
+        <section id="view-servicos" class="view-section hidden" data-modulo="servicos">
+          <div class="card">
+            <h3>Novo Serviço</h3>
+            <form id="form-servico" class="grid-form">
+              <input type="text" id="servico-nome" placeholder="Nome do serviço" required />
+              <input type="number" step="0.01" id="servico-preco" placeholder="Valor (R$)" required />
+              <input type="number" id="servico-duracao" placeholder="Duração (min)" value="60" />
+              <input type="text" id="servico-descricao" placeholder="Descrição breve" />
+              <button type="submit" class="btn btn-primary">Salvar Serviço</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Catálogo de Serviços</h3>
+            <div id="lista-servicos" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: AGENDA -->
+        <section id="view-agenda" class="view-section hidden" data-modulo="agenda">
+          <div class="card">
+            <h3>Novo Agendamento</h3>
+            <form id="form-agenda" class="grid-form">
+              <input type="text" id="agenda-cliente" placeholder="Nome do cliente" required />
+              <input type="text" id="agenda-servico" placeholder="Serviço" required />
+              <input type="datetime-local" id="agenda-data" required />
+              <input type="text" id="agenda-profissional" placeholder="Profissional responsável" data-modulo="agenda_por_profissional" />
+              <select id="agenda-status">
+                <option value="Agendado">Agendado</option>
+                <option value="Confirmado">Confirmado</option>
+                <option value="Concluído">Concluído</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+              <button type="submit" class="btn btn-primary">Agendar</button>
+            </form>
+          </div>
+
+          <div class="card" data-modulo="agendamento_online">
+            <h3>Link de Agendamento Online</h3>
+            <p class="muted-text">Compartilhe este identificador da sua página comercial para clientes agendarem:</p>
+            <code id="link-agendamento-online" class="code-pill"></code>
+          </div>
+
+          <div class="card">
+            <h3>Atendimentos Agendados</h3>
+            <div id="lista-agenda" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: PORTFÓLIO E PÁGINA COMERCIAL -->
+        <section id="view-portfolio" class="view-section hidden" data-modulo="portfolio">
+          <div class="card">
+            <h3>Adicionar ao Portfólio Digital</h3>
+            <form id="form-portfolio" class="grid-form">
+              <input type="text" id="portfolio-titulo" placeholder="Título do trabalho ou projeto" required />
+              <input type="text" id="portfolio-categoria" placeholder="Categoria" required />
+              <input type="url" id="portfolio-imagem" placeholder="URL da imagem (opcional)" />
+              <input type="text" id="portfolio-descricao" placeholder="Descrição do resultado" />
+              <button type="submit" class="btn btn-primary">Publicar no Portfólio</button>
+            </form>
+          </div>
+
+          <div class="card" data-modulo="pagina_comercial">
+            <h3>Página Comercial Personalizada</h3>
+            <div class="grid-form">
+              <input type="text" id="pagina-slogan" placeholder="Slogan da sua página comercial" />
+              <input type="text" id="pagina-destaque" placeholder="Mensagem de destaque / promoção" />
+              <button type="button" id="btn-salvar-pagina" class="btn btn-secondary">Salvar Página Comercial</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Itens do Portfólio</h3>
+            <div id="lista-portfolio" class="cards-grid"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: FINANCEIRO -->
+        <section id="view-financeiro" class="view-section hidden" data-modulo="financeiro_basico">
+          <div class="card">
+            <h3>Lançamento Financeiro</h3>
+            <form id="form-financeiro" class="grid-form">
+              <select id="fin-tipo">
+                <option value="entrada">Receita / Entrada</option>
+                <option value="saida">Despesa / Saída</option>
+              </select>
+              <input type="text" id="fin-descricao" placeholder="Descrição" required />
+              <input type="number" step="0.01" id="fin-valor" placeholder="Valor (R$)" required />
+              <input type="date" id="fin-data" required />
+              <button type="submit" class="btn btn-primary">Registrar Lançamento</button>
+            </form>
+          </div>
+
+          <div class="card" data-modulo="fluxo_caixa">
+            <h3>Fluxo de Caixa e Planilha Mensal</h3>
+            <div id="resumo-fluxo-caixa" class="kpi-grid compact"></div>
+          </div>
+
+          <div class="card">
+            <h3>Lançamentos</h3>
+            <div id="lista-financeiro" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: RELATÓRIOS -->
+        <section id="view-relatorios" class="view-section hidden" data-modulo="relatorios_financeiros">
+          <div class="card">
+            <h3>Relatórios Financeiros</h3>
+            <div id="relatorio-financeiro-box"></div>
+          </div>
+
+          <div class="card" data-modulo="relatorios_desempenho">
+            <h3>Desempenho, Indicadores Comerciais e Produtividade</h3>
+            <div id="relatorio-desempenho-box"></div>
+          </div>
+
+          <div class="card" data-modulo="relatorios_comparativos">
+            <h3>Indicadores Gerenciais Avançados e Relatórios Comparativos (Premium)</h3>
+            <div id="relatorio-comparativo-box"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: EQUIPE E PERFIS INTERNOS (MESMO LOGIN DA EMPRESA) -->
+        <section id="view-equipe" class="view-section hidden">
+          <div id="mt-painel-gestao-operadores" class="card">
+            <h3>Cadastrar Usuário Interno (Mesmo Login da Empresa)</h3>
+            <p id="mt-resumo-limite-equipe" class="muted-text"></p>
+
+            <form id="mt-form-novo-operador" class="grid-form">
+              <input type="text" id="mt-op-nome" placeholder="Nome do operador" required />
+              <input type="text" id="mt-op-login" placeholder="Login interno (ex: carlos)" required />
+              <select id="mt-op-perfil"></select>
+              <input type="password" id="mt-op-pin" maxlength="6" placeholder="PIN interno (opcional)" />
+              <button type="submit" class="btn btn-primary">+ Adicionar Usuário</button>
+            </form>
+
+            <p id="mt-msg-equipe" class="helper-msg"></p>
+            <div id="mt-tabela-operadores" class="table-wrap"></div>
+          </div>
+
+          <div class="card">
+            <h3>Perfis Internos Disponíveis</h3>
+            <div id="guia-perfis-internos" class="cards-grid"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: PLANOS E ESPECIFICAÇÕES -->
+        <section id="view-planos" class="view-section hidden">
+          <div class="card">
+            <h3>Planos Multitech — Especificações Completas</h3>
+            <p class="muted-text">
+              Veja os recursos e o limite de usuários internos no mesmo login de cada plano.
             </p>
-            <button type="button" onclick="fazerLogout()">Sair da Conta</button>
+            <div id="vitrine-planos-logada" class="planos-grid"></div>
+          </div>
+        </section>
+
+        <!-- VIEW: CONFIGURAÇÕES DA EMPRESA (WHITE-LABEL) -->
+        <section id="view-configuracoes" class="view-section hidden">
+          <div class="card">
+            <h3>Identidade da Empresa (White-Label)</h3>
+            <form id="form-config-empresa" class="grid-form">
+              <input type="text" id="cfg-nome-empresa" placeholder="Nome da empresa" required />
+              <input type="color" id="cfg-cor-primaria" value="#0f172a" title="Cor principal" />
+              <input type="text" id="cfg-telefone" placeholder="Telefone de contato" />
+              <input type="text" id="cfg-cidade" placeholder="Cidade / Estado" />
+              <button type="submit" class="btn btn-primary">Salvar Configurações</button>
+            </form>
+            <p id="cfg-msg" class="helper-msg"></p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL DE SELEÇÃO DE OPERADOR INTERNO -->
+  <div id="mt-modal-operadores" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h3>Quem está acessando?</h3>
+      <p class="muted-text">Selecione seu usuário interno dentro desta conta.</p>
+
+      <div id="mt-lista-operadores-login" class="operadores-list"></div>
+
+      <div id="mt-area-pin" class="hidden pin-box">
+        <label for="mt-input-pin">Digite seu PIN interno:</label>
+        <div class="pin-row">
+          <input type="password" id="mt-input-pin" maxlength="6" placeholder="••••" />
+          <button type="button" id="mt-btn-confirmar-pin" class="btn btn-primary">Entrar</button>
         </div>
+        <p id="mt-erro-pin" class="error-text"></p>
+      </div>
     </div>
+  </div>
 
-    <!-- Layout Principal -->
-    <div id="appLayout" class="app-layout" style="display: none;">
-        <aside class="sidebar">
-            <div class="marca-sidebar">
-                <div class="logo-box" id="logoLetra">M</div>
-                <div>
-                    <h2 id="nomeEmpresaSidebar">MULTITECH</h2>
-                    <p id="subtituloEmpresaSidebar">Gestão Inteligente para Pequenos Negócios</p>
-                </div>
-            </div>
-
-            <div class="assinatura-badge" id="badgeAssinatura">
-                Assinatura: Ativa
-            </div>
-
-            <div class="nuvem-badge" id="statusNuvem" data-estado="sincronizado">
-                ☁ Nuvem sincronizada
-            </div>
-
-            <nav class="menu-nav">
-                <button type="button" class="nav-btn" onclick="mostrarSecao('dashboardSecao')">📊 Dashboard</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('planilhaOrcamentaria')">📋 Planilha Orçamentária</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('agendaClientes')" id="navAgendaBtn">📅 Agenda (Standard/Premium)</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('assistentePremium')" id="navPremiumBtn">🤖 Balanço & Lembretes (Premium)</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('planosServicos')">📦 Planos (Básico / Standard / Premium)</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('gestaoClientes')">👥 Clientes</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('portfolioDigital')">🖼 Portfólio & Galeria</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('vouchersFidelidade')">🎟 Vouchers Fidelidade</button>
-                <button type="button" class="nav-btn" onclick="mostrarSecao('configEmpresa')">⚙ Configurações</button>
-            </nav>
-
-            <button type="button" class="btn-sair" onclick="fazerLogout()">Sair</button>
-        </aside>
-
-        <main class="conteudo-principal">
-            <!-- DASHBOARD -->
-            <section id="dashboardSecao" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h1>Dashboard Operacional</h1>
-                        <p class="descricao-secao">Visão geral de clientes, orçamentos, planos, portfólio, vouchers e ciclo de 30 dias</p>
-                    </div>
-                    <div class="acoes-rapidas">
-                        <button type="button" class="btn-primario" onclick="prepararNovoOrcamento()">+ Novo Orçamento</button>
-                        <button type="button" class="btn-secundario" onclick="mostrarSecao('planosServicos')">Planos</button>
-                        <button type="button" class="btn-secundario" onclick="mostrarSecao('portfolioDigital')">Portfólio</button>
-                        <button type="button" class="btn-secundario" onclick="mostrarSecao('vouchersFidelidade')">Vouchers</button>
-                    </div>
-                </div>
-
-                <div class="grid-kpis">
-                    <div class="kpi-card">
-                        <span class="kpi-label">Clientes Cadastrados</span>
-                        <strong class="kpi-valor" id="kpiTotalClientes">0</strong>
-                        <small class="kpi-sub">Base ativa na nuvem</small>
-                    </div>
-
-                    <div class="kpi-card">
-                        <span class="kpi-label">Planilhas Orçamentárias</span>
-                        <strong class="kpi-valor" id="kpiTotalOrcamentos">0</strong>
-                        <small class="kpi-sub" id="kpiOrcamentosAprovados">0 aprovados</small>
-                    </div>
-
-                    <div class="kpi-card">
-                        <span class="kpi-label">Valor em Orçamentos</span>
-                        <strong class="kpi-valor" id="kpiValorTotalOrcamentos">R$ 0,00</strong>
-                        <small class="kpi-sub" id="kpiValorAprovado">Aprovado: R$ 0,00</small>
-                    </div>
-
-                    <div class="kpi-card">
-                        <span class="kpi-label">Planos / Portfólio / Vouchers</span>
-                        <strong class="kpi-valor" id="kpiResumoModulos">0 / 0 / 0</strong>
-                        <small class="kpi-sub">Planos • Fotos • Vouchers</small>
-                    </div>
-
-                    <div class="kpi-card">
-                        <span class="kpi-label">Ciclo / Assinatura</span>
-                        <strong class="kpi-valor" id="kpiCicloDias">30d rest.</strong>
-                        <small class="kpi-sub" id="kpiDetalheCiclo">0 de 30 dias corridos</small>
-                    </div>
-                </div>
-
-                <div class="grid-duas-colunas">
-                    <div class="subcard">
-                        <h3>Últimos Orçamentos</h3>
-                        <div id="resumoUltimosOrcamentos" class="lista-resumo">
-                            <p class="texto-vazio">Nenhum orçamento lançado ainda.</p>
-                        </div>
-                    </div>
-
-                    <div class="subcard">
-                        <h3>Últimos Clientes</h3>
-                        <div id="resumoUltimosClientes" class="lista-resumo">
-                            <p class="texto-vazio">Nenhum cliente cadastrado ainda.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- AGENDA & INTEGRAÇÃO CLIENTE FINAL (STANDARD E PREMIUM) -->
-            <section id="agendaClientes" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Agenda & Integração com Cliente Final <span class="status-pill">Standard / Premium</span></h2>
-                        <p class="descricao-secao">Compartilhe seu link de agendamento para o cliente marcar horário direto pelo celular</p>
-                    </div>
-                    <button type="button" class="btn-primario" onclick="copiarLinkAgendamento()">🔗 Copiar Link de Agendamento</button>
-                </div>
-
-                <div id="agendaBloqueadaAviso" class="aviso-plano" style="display: none;">
-                    Recurso exclusivo dos planos <strong>Standard</strong> e <strong>Premium</strong>. Altere o nível do plano em Configurações para liberar.
-                </div>
-
-                <div id="agendaConteudo">
-                    <div class="grid-form-agenda">
-                        <input type="text" id="agClienteNome" list="sugestoesClientes" placeholder="Nome do cliente">
-                        <input type="text" id="agClienteTelefone" placeholder="WhatsApp / Telefone">
-                        <input type="text" id="agServico" placeholder="Serviço (ex.: Corte, Banho Pet, Aula)">
-                        <input type="date" id="agData">
-                        <input type="time" id="agHora">
-                        <button type="button" class="btn-primario" onclick="salvarAgendamentoManual()">+ Agendar Horário</button>
-                    </div>
-
-                    <hr class="divisor">
-
-                    <div class="cabecalho-lista">
-                        <h3>Horários Agendados</h3>
-                        <span id="totalAgendamentosBadge" class="badge-contagem">0 agendamentos</span>
-                    </div>
-
-                    <div id="listaAgendamentos" class="lista-cards"></div>
-                </div>
-            </section>
-
-            <!-- ASSISTENTE AUTOMÁTICO DE BALANÇO & LEMBRETES (PREMIUM) -->
-            <section id="assistentePremium" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Balanço Automático & Lembretes Inteligentes <span class="status-pill status-aprovado">Premium</span></h2>
-                        <p class="descricao-secao">Relatório diário automático, alerta de clientes inativos (+15 dias) e sugestões de postagem</p>
-                    </div>
-                    <button type="button" class="btn-primario" onclick="copiarBalancoDiario()">📋 Copiar Balanço do Dia</button>
-                </div>
-
-                <div id="premiumBloqueadoAviso" class="aviso-plano" style="display: none;">
-                    Recurso exclusivo do plano <strong>Premium</strong>. Altere o nível do plano em Configurações para liberar.
-                </div>
-
-                <div id="premiumConteudo" class="grid-duas-colunas">
-                    <div class="subcard">
-                        <h3>📈 Resumo Diário Automático</h3>
-                        <div id="boxBalancoDiario" class="lista-resumo"></div>
-                    </div>
-
-                    <div class="subcard">
-                        <h3>⏰ Clientes Inativos (+15 dias) & Redes Sociais</h3>
-                        <div id="boxLembretesPremium" class="lista-resumo"></div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- PLANILHA ORÇAMENTÁRIA -->
-            <section id="planilhaOrcamentaria" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Planilha Orçamentária</h2>
-                        <p class="descricao-secao">Defina valores conforme os serviços/planos escolhidos pelo cliente e calcule o total na hora</p>
-                    </div>
-                    <button type="button" class="btn-secundario" onclick="exportarOrcamentosJSON()">📥 Exportar Orçamentos JSON</button>
-                </div>
-
-                <div class="form-orcamento-topo">
-                    <div class="campo-grupo">
-                        <label for="orcTitulo">Título / Demanda do Cliente</label>
-                        <input type="text" id="orcTitulo" placeholder="Ex.: Pacote Standard + Divulgação">
-                    </div>
-
-                    <div class="campo-grupo">
-                        <label for="orcClienteNome">Cliente</label>
-                        <input type="text" id="orcClienteNome" list="sugestoesClientes" placeholder="Selecione ou digite o nome do cliente">
-                        <datalist id="sugestoesClientes"></datalist>
-                    </div>
-
-                    <div class="campo-grupo">
-                        <label for="orcStatus">Status do Orçamento</label>
-                        <select id="orcStatus">
-                            <option value="Rascunho">Rascunho</option>
-                            <option value="Enviado">Enviado</option>
-                            <option value="Aprovado">Aprovado</option>
-                        </select>
-                    </div>
-
-                    <div class="campo-grupo">
-                        <label for="orcDesconto">Desconto / Voucher (R$)</label>
-                        <input type="number" id="orcDesconto" step="0.01" min="0" value="0" oninput="recalcularTotaisPlanilha()">
-                    </div>
-                </div>
-
-                <div class="barra-aplicar-plano">
-                    <div class="campo-grupo campo-flex">
-                        <label for="selectPlanoRapido">Adicionar Serviço ou Plano Escolhido (Básico / Standard / Premium)</label>
-                        <select id="selectPlanoRapido"></select>
-                    </div>
-                    <button type="button" class="btn-secundario" onclick="inserirPlanoNaPlanilha()">+ Inserir na Planilha</button>
-                    <button type="button" class="btn-secundario" onclick="adicionarLinhaItem()">+ Linha Avulsa</button>
-                    <button type="button" class="btn-limpar" onclick="limparFormularioOrcamento()">Limpar</button>
-                </div>
-
-                <div class="tabela-responsiva">
-                    <table class="tabela-planilha">
-                        <thead>
-                            <tr>
-                                <th>Descrição do Serviço / Item</th>
-                                <th class="col-curta">Unid.</th>
-                                <th class="col-numero">Qtd.</th>
-                                <th class="col-numero">Valor Escolhido (R$)</th>
-                                <th class="col-numero">Subtotal (R$)</th>
-                                <th class="col-acao">Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody id="corpoItensPlanilha"></tbody>
-                    </table>
-                </div>
-
-                <div class="rodape-planilha">
-                    <div class="totais-planilha">
-                        <div>Subtotal dos serviços/itens: <strong id="planilhaSubtotal">R$ 0,00</strong></div>
-                        <div>Desconto: <strong id="planilhaDesconto">R$ 0,00</strong></div>
-                        <div class="total-destaque">Total Geral: <strong id="planilhaTotalGeral">R$ 0,00</strong></div>
-                    </div>
-
-                    <button type="button" class="btn-primario" id="btnSalvarOrcamento" onclick="salvarOrcamento()">
-                        Salvar Orçamento
-                    </button>
-                </div>
-
-                <hr class="divisor">
-
-                <div class="cabecalho-lista">
-                    <h3>Orçamentos Salvos</h3>
-                    <span id="totalOrcamentosBadge" class="badge-contagem">0 salvos</span>
-                </div>
-
-                <div class="barra-ferramentas">
-                    <input type="text" id="buscarOrcamento" placeholder="Buscar orçamento por título, cliente ou status..." oninput="filtrarOrcamentos()">
-                </div>
-
-                <div id="listaOrcamentos" class="lista-cards"></div>
-            </section>
-
-            <!-- PLANOS DE SERVIÇOS OFERECIDOS -->
-            <section id="planosServicos" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Planos de Serviços (Básico, Standard e Premium)</h2>
-                        <p class="descricao-secao">Cadastre e ajuste os valores dos planos escolhidos pelos clientes e envie direto para o orçamento</p>
-                    </div>
-                    <button type="button" class="btn-secundario" onclick="restaurarPlanosPadrao()">Restaurar Base Básico/Standard/Premium</button>
-                </div>
-
-                <div class="grid-form-plano">
-                    <input type="text" id="planoNome" placeholder="Nome do plano (ex.: Plano Standard)">
-                    <select id="planoNivel">
-                        <option value="Básico">Nível Básico</option>
-                        <option value="Standard">Nível Standard</option>
-                        <option value="Premium">Nível Premium</option>
-                        <option value="Personalizado">Serviço / Personalizado</option>
-                    </select>
-                    <input type="number" id="planoValor" step="0.01" min="0" placeholder="Valor (R$)">
-                    <input type="text" id="planoPeriodicidade" placeholder="Periodicidade (ex.: Mensal, Projeto)">
-                    <input type="text" id="planoDescricao" class="span-2" placeholder="O que está incluído neste nível de serviço">
-                    <button type="button" class="btn-primario" id="btnSalvarPlano" onclick="salvarPlano()">Salvar Plano</button>
-                </div>
-
-                <hr class="divisor">
-
-                <div class="cabecalho-lista">
-                    <h3>Planos Cadastrados</h3>
-                    <span id="totalPlanosBadge" class="badge-contagem">0 planos</span>
-                </div>
-
-                <div id="listaPlanos" class="lista-cards"></div>
-            </section>
-
-            <!-- GESTÃO DE CLIENTES -->
-            <section id="gestaoClientes" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Gestão de Clientes</h2>
-                        <p class="descricao-secao">Cadastre, edite, pesquise e exporte sua base de clientes</p>
-                    </div>
-                    <button type="button" class="btn-secundario" onclick="exportarClientesJSON()">📥 Exportar Clientes JSON</button>
-                </div>
-
-                <div class="grid-form-cliente">
-                    <input type="text" id="nomeCliente" placeholder="Nome completo ou empresa do cliente">
-                    <input type="text" id="telefoneCliente" placeholder="Telefone / WhatsApp">
-                    <input type="email" id="emailCliente" placeholder="E-mail do cliente">
-                    <button type="button" class="btn-primario" onclick="cadastrarCliente()">Salvar Cliente</button>
-                </div>
-
-                <hr class="divisor">
-
-                <div class="cabecalho-lista">
-                    <h3>Clientes Cadastrados</h3>
-                    <span id="totalClientes" class="badge-contagem">0 cadastrados</span>
-                </div>
-
-                <div class="barra-ferramentas">
-                    <input type="text" id="buscarCliente" placeholder="Buscar cliente por nome, telefone ou e-mail..." oninput="filtrarClientes()">
-                </div>
-
-                <div id="listaClientes" class="lista-cards"></div>
-            </section>
-
-            <!-- PORTFÓLIO DIGITAL E GALERIA DE FOTOS -->
-            <section id="portfolioDigital" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Portfólio Digital & Galeria de Fotos</h2>
-                        <p class="descricao-secao">Monte sua vitrine de serviços realizados e copie textos prontos para divulgar nas redes sociais</p>
-                    </div>
-                </div>
-
-                <div class="grid-form-portfolio">
-                    <input type="text" id="portTitulo" placeholder="Título do trabalho (ex.: Identidade & Gestão Standard)">
-                    <select id="portCategoria">
-                        <option value="Básico">Básico</option>
-                        <option value="Standard">Standard</option>
-                        <option value="Premium">Premium</option>
-                        <option value="Prestação de Serviço">Prestação de Serviço</option>
-                    </select>
-                    <input type="text" id="portImagemUrl" placeholder="URL da foto (opcional) ou envie arquivo abaixo">
-                    <input type="file" id="portImagemArquivo" accept="image/*">
-                    <input type="text" id="portDescricao" class="span-2" placeholder="Descrição do serviço realizado para divulgação">
-                    <button type="button" class="btn-primario" id="btnSalvarPortfolio" onclick="salvarItemPortfolio()">Publicar no Portfólio</button>
-                </div>
-
-                <hr class="divisor">
-
-                <div class="cabecalho-lista">
-                    <h3>Galeria do Portfólio</h3>
-                    <span id="totalPortfolioBadge" class="badge-contagem">0 itens</span>
-                </div>
-
-                <div id="listaPortfolio" class="lista-cards"></div>
-            </section>
-
-            <!-- VOUCHERS POR FIDELIDADE -->
-            <section id="vouchersFidelidade" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Vouchers por Fidelidade</h2>
-                        <p class="descricao-secao">Crie cupons/vouchers de fidelidade para clientes recorrentes e aplique descontos nos orçamentos</p>
-                    </div>
-                </div>
-
-                <div class="grid-form-voucher">
-                    <input type="text" id="voucherCodigo" placeholder="Código (ex.: FIDEL10)">
-                    <select id="voucherTipo">
-                        <option value="percentual">Desconto em % (ex.: 10%)</option>
-                        <option value="valor_fixo">Valor Fixo em R$ (ex.: R$ 50)</option>
-                    </select>
-                    <input type="number" id="voucherValor" step="0.01" min="0" placeholder="Valor ou % de desconto">
-                    <input type="text" id="voucherCliente" list="sugestoesClientes" placeholder="Cliente fidelizado (opcional)">
-                    <input type="text" id="voucherDescricao" placeholder="Motivo / regra de fidelidade">
-                    <button type="button" class="btn-primario" onclick="salvarVoucher()">Criar Voucher</button>
-                </div>
-
-                <hr class="divisor">
-
-                <div class="cabecalho-lista">
-                    <h3>Vouchers Cadastrados</h3>
-                    <span id="totalVouchersBadge" class="badge-contagem">0 vouchers</span>
-                </div>
-
-                <div id="listaVouchers" class="lista-cards"></div>
-            </section>
-
-            <!-- CONFIGURAÇÕES DA EMPRESA -->
-            <section id="configEmpresa" class="secao-card">
-                <div class="cabecalho-secao">
-                    <div>
-                        <h2>Identidade & Plano da Empresa</h2>
-                        <p class="descricao-secao">Personalize o nome, subtítulo e o nível de plano ativo (Básico, Standard ou Premium)</p>
-                    </div>
-                </div>
-
-                <div class="grid-config">
-                    <input type="text" id="inputNomeEmpresa" placeholder="Nome da empresa">
-                    <input type="text" id="inputSubtituloEmpresa" placeholder="Subtítulo da empresa">
-                    <select id="selectNivelPlanoEmpresa">
-                        <option value="basico">Plano Básico (Essencial)</option>
-                        <option value="standard">Plano Standard (+ Agenda Cliente Final)</option>
-                        <option value="premium">Plano Premium (+ Agenda + Balanço & Lembretes)</option>
-                    </select>
-                    <button type="button" class="btn-primario" onclick="salvarConfiguracoesEmpresa()">Salvar Configurações</button>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <script src="./app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
