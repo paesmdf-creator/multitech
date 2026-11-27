@@ -19,6 +19,7 @@ import { auth, db } from "./firebase-config.js";
 
 const ROOT_COLLECTION = "multitech_empresas";
 const DEMO_EMPRESA_ID = "admin_geral_multitech";
+const STORAGE_EMPRESA_KEY = "multitech_nome_empresa_custom";
 
 const PLANOS_CATALOGO = [
   {
@@ -108,6 +109,53 @@ function formatarMoeda(valor) {
   return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function obterNomeEmpresaSalvo() {
+  try {
+    return (localStorage.getItem(STORAGE_EMPRESA_KEY) || "").trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+function aplicarNomeEmpresaNaTela(nomePadrao) {
+  if (!empresaNomeEl) return;
+  const salvo = obterNomeEmpresaSalvo();
+  empresaNomeEl.textContent = salvo || nomePadrao || "Multitech";
+}
+
+function garantirBotaoEditarEmpresa() {
+  if (!empresaNomeEl || document.getElementById("mt-btn-editar-empresa")) return;
+
+  const btnEditar = document.createElement("button");
+  btnEditar.id = "mt-btn-editar-empresa";
+  btnEditar.type = "button";
+  btnEditar.textContent = "Editar nome";
+  btnEditar.className = "btn btn-outline btn-sm";
+  btnEditar.style.marginLeft = "8px";
+
+  btnEditar.addEventListener("click", async () => {
+    const atual = empresaNomeEl.textContent?.trim() || "Multitech";
+    const novoNome = window.prompt("Digite o nome da empresa do cliente:", atual);
+    if (!novoNome) return;
+
+    const limpo = novoNome.trim();
+    if (!limpo) return;
+
+    empresaNomeEl.textContent = limpo;
+    try {
+      localStorage.setItem(STORAGE_EMPRESA_KEY, limpo);
+    } catch (_) {}
+
+    await setDoc(
+      doc(db, ROOT_COLLECTION, activeEmpresaId),
+      { nomeEmpresa: limpo, atualizadoEm: new Date().toISOString() },
+      { merge: true }
+    ).catch(() => {});
+  });
+
+  empresaNomeEl.insertAdjacentElement("afterend", btnEditar);
+}
+
 function alternarAbaAuth(modo) {
   const isLogin = modo === "login";
   tabLoginEl?.classList.toggle("active", isLogin);
@@ -134,7 +182,9 @@ function abrirPainelDireto(empresaId, nomeEmpresa, emailEmpresa, planoId) {
   authScreenEl?.classList.add("hidden");
   appShellEl?.classList.remove("hidden");
 
-  if (empresaNomeEl) empresaNomeEl.textContent = nomeEmpresa || "Multitech";
+  aplicarNomeEmpresaNaTela(nomeEmpresa || "Multitech");
+  garantirBotaoEditarEmpresa();
+
   if (empresaEmailEl) empresaEmailEl.textContent = emailEmpresa || "Administrador Geral";
   if (operadorBadgeEl) operadorBadgeEl.textContent = "Administrador Geral";
 
@@ -172,7 +222,6 @@ formLoginEl?.addEventListener("submit", async (e) => {
   try {
     await signInWithEmailAndPassword(auth, email, senha);
   } catch (err) {
-    // Se o Firebase Auth falhar na rede/credencial durante apresentação, libera o painel do administrador sem travar
     abrirPainelDireto(DEMO_EMPRESA_ID, "Multitech", email || "Administrador Geral", planoAtualId);
   }
 });
