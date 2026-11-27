@@ -131,7 +131,6 @@ function garantirBotaoEditarEmpresa() {
   btnEditar.type = "button";
   btnEditar.textContent = "Editar nome";
   btnEditar.className = "btn btn-outline btn-sm";
-  btnEditar.style.marginLeft = "8px";
 
   btnEditar.addEventListener("click", async () => {
     const atual = empresaNomeEl.textContent?.trim() || "Multitech";
