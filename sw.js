@@ -1,5 +1,5 @@
-const CACHE_NAME = "multitech-pwa-v4";
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = "multitech-pwa-v6";
+const ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
@@ -7,39 +7,27 @@ const ASSETS_TO_CACHE = [
   "./js/firebase-config.js",
   "./js/planos-permissoes.js",
   "./js/operadores.js",
-  "./js/vitrine-planos.js",
   "./js/app.js"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      for (const asset of ASSETS_TO_CACHE) {
-        try {
-          await cache.add(asset);
-        } catch (err) {
-          // Ignora arquivo ausente para não travar a instalação
-        }
-      }
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      )
-    )
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(event.request)
@@ -50,8 +38,6 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() =>
-        caches.match(event.request).then((cached) => cached || caches.match("./index.html"))
-      )
+      .catch(() => caches.match(event.request))
   );
 });
