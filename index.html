@@ -70,6 +70,7 @@
       </div>
 
       <div class="topbar-right">
+        <span id="mt-plano-atual-badge" class="badge badge-accent">Plano: Enterprise</span>
         <span id="mt-operador-atual-badge" class="badge">Administrador</span>
         <button type="button" id="mt-btn-trocar-operador" class="btn btn-outline btn-sm hidden">Trocar</button>
         <button type="button" id="mt-btn-instalar" class="btn btn-accent btn-sm hidden">Instalar App</button>
@@ -83,8 +84,10 @@
           <button type="button" class="nav-item active" data-view="dashboard">Dashboard</button>
           <button type="button" class="nav-item" data-view="clientes">Clientes</button>
           <button type="button" class="nav-item" data-view="servicos">Serviços &amp; Pedidos</button>
-          <button type="button" class="nav-item" data-view="financeiro">Financeiro</button>
+          <button type="button" class="nav-item" data-view="financeiro">Financeiro &amp; Gráfico</button>
           <button type="button" class="nav-item" data-view="equipe">Equipe &amp; Operadores</button>
+          <button type="button" class="nav-item" data-view="montagem-equipes">Montagem de Equipes</button>
+          <button type="button" class="nav-item" data-view="planos">Planos &amp; Licenças</button>
         </nav>
       </aside>
 
@@ -115,9 +118,14 @@
           </div>
 
           <div class="card">
+            <h3>Resumo Financeiro Visual</h3>
+            <div id="mt-dash-grafico"></div>
+          </div>
+
+          <div class="card">
             <h3>Acesso Rápido e Atalho no Dispositivo</h3>
             <p class="muted-text">
-              Para instalar ou criar atalho na tela inicial: no Chrome/Edge use o botão <strong>Instalar App</strong> (ou o menu do navegador <strong>Instalar aplicativo / Adicionar à tela inicial</strong>). No iPhone/iPad (Safari), toque em <strong>Compartilhar</strong> e <strong>Adicionar à Tela de Início</strong>.
+              Para instalar ou criar atalho na tela inicial: no Chrome/Edge use o botão <strong>Instalar App</strong> ou o menu <strong>Instalar aplicativo / Adicionar à tela inicial</strong>. No iPhone/iPad (Safari), toque em <strong>Compartilhar</strong> e <strong>Adicionar à Tela de Início</strong>.
             </p>
           </div>
         </section>
@@ -184,7 +192,12 @@
 
         <section id="view-financeiro" class="view-panel">
           <div class="panel-head">
-            <h2>Financeiro</h2>
+            <h2>Financeiro &amp; Gráfico</h2>
+          </div>
+
+          <div class="card">
+            <h3>Gráfico Financeiro (Entradas x Saídas x Saldo)</h3>
+            <div id="mt-fin-grafico"></div>
           </div>
 
           <form id="mt-form-lancamento" class="card form-grid">
@@ -243,6 +256,47 @@
           </div>
 
           <div id="mt-tabela-operadores" class="card table-wrap"></div>
+        </section>
+
+        <section id="view-montagem-equipes" class="view-panel">
+          <div class="panel-head">
+            <h2>Montagem de Equipes</h2>
+          </div>
+
+          <form id="mt-form-montar-equipe" class="card form-grid">
+            <label class="field">
+              <span>Nome da Equipe / Frente</span>
+              <input type="text" id="mt-eq-nome" required placeholder="Ex: Equipe Campo A" />
+            </label>
+            <label class="field">
+              <span>Líder / Responsável</span>
+              <input type="text" id="mt-eq-lider" required placeholder="Nome do líder" />
+            </label>
+            <label class="field">
+              <span>Integrantes (separados por vírgula)</span>
+              <input type="text" id="mt-eq-membros" placeholder="Ex: Carlos, Ana, Marcos" />
+            </label>
+            <label class="field">
+              <span>Turno / Alocação</span>
+              <input type="text" id="mt-eq-turno" placeholder="Ex: Manhã / Região Sul" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Salvar Equipe</button>
+            </div>
+          </form>
+
+          <div id="mt-lista-equipes" class="card table-wrap"></div>
+        </section>
+
+        <section id="view-planos" class="view-panel">
+          <div class="panel-head">
+            <h2>Planos &amp; Licenças</h2>
+          </div>
+
+          <p class="muted-text">
+            Selecione o plano ativo da empresa para demonstrar ao cliente os limites de operadores e recursos habilitados.
+          </p>
+          <div id="mt-grid-planos" class="plans-grid"></div>
         </section>
       </main>
     </div>
