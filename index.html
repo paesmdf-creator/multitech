@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#DCEAF7" />
   <title>Multitech — Gestão para Pequenos Negócios</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="stylesheet" href="./css/style.css" />
@@ -12,7 +12,7 @@
   <section id="mt-auth-screen" class="auth-wrapper">
     <div class="auth-card">
       <div class="brand-header">
-        <div class="brand-logo">MT</div>
+        <div class="logo-mt">MT</div>
         <div>
           <h1>Multitech</h1>
           <p class="muted-text">Sistema de gestão para pequenos negócios e equipes</p>
@@ -57,81 +57,88 @@
   </section>
 
   <div id="mt-app-shell" class="app-shell hidden">
-    <header class="topbar">
-      <div class="topbar-left">
-        <button type="button" id="mt-btn-menu" class="btn btn-outline btn-sm mobile-only">Menu</button>
-        <div class="brand-compact">
-          <span class="brand-logo sm">MT</span>
-          <div>
-            <strong id="mt-empresa-nome">Multitech</strong>
-            <small id="mt-empresa-email" class="muted-text"></small>
+    <header class="top-header">
+      <div class="logo-area">
+        <button type="button" id="mt-btn-menu" class="btn btn-sm mobile-only">Menu</button>
+        <div class="logo-mt">MT</div>
+        <div class="user-info">
+          <div class="empresa-titulo-linha">
+            <span id="mt-empresa-nome" class="user-name">Multitech</span>
           </div>
+          <span id="mt-empresa-email" class="user-email">Administrador Geral</span>
         </div>
       </div>
 
-      <div class="topbar-right">
-        <span id="mt-plano-atual-badge" class="badge badge-accent">Plano: Enterprise</span>
-        <span id="mt-operador-atual-badge" class="badge">Administrador</span>
-        <button type="button" id="mt-btn-trocar-operador" class="btn btn-outline btn-sm hidden">Trocar</button>
-        <button type="button" id="mt-btn-instalar" class="btn btn-accent btn-sm hidden">Instalar App</button>
-        <button type="button" id="mt-btn-sair" class="btn btn-outline btn-sm">Sair</button>
+      <div class="account-info">
+        <span id="mt-plano-atual-badge" class="plan-badge">Plano: Standard</span>
+        <span id="mt-operador-atual-badge" class="badge">Administrador Geral</span>
+        <button type="button" id="mt-btn-trocar-operador" class="btn btn-sm hidden">Trocar</button>
+        <button type="button" id="mt-btn-instalar" class="btn btn-primary btn-sm hidden">Instalar App</button>
+        <button type="button" id="mt-btn-sair" class="btn btn-sm">Sair</button>
       </div>
     </header>
 
-    <div class="app-body">
+    <div class="dashboard-layout">
       <aside id="mt-sidebar" class="sidebar">
-        <nav class="nav-list">
-          <button type="button" class="nav-item active" data-view="dashboard">Dashboard</button>
-          <button type="button" class="nav-item" data-view="clientes">Clientes</button>
-          <button type="button" class="nav-item" data-view="servicos">Serviços &amp; Pedidos</button>
-          <button type="button" class="nav-item" data-view="financeiro">Financeiro &amp; Gráfico</button>
-          <button type="button" class="nav-item" data-view="equipe">Equipe &amp; Operadores</button>
-          <button type="button" class="nav-item" data-view="montagem-equipes">Montagem de Equipes</button>
-          <button type="button" class="nav-item" data-view="planos">Planos &amp; Licenças</button>
+        <nav aria-label="Navegação principal">
+          <ul class="nav-list">
+            <li><button type="button" class="nav-item active" data-view="dashboard">Dashboard</button></li>
+            <li><button type="button" class="nav-item" data-view="clientes">Clientes</button></li>
+            <li><button type="button" class="nav-item" data-view="servicos">Serviços &amp; Pedidos</button></li>
+            <li><button type="button" class="nav-item" data-view="financeiro">Financeiro &amp; Gráfico</button></li>
+            <li><button type="button" class="nav-item" data-view="equipe">Equipe &amp; Operadores</button></li>
+            <li><button type="button" class="nav-item" data-view="montagem-equipes">Montagem de Equipes</button></li>
+            <li><button type="button" class="nav-item" data-view="planos">Planos &amp; Licenças</button></li>
+          </ul>
         </nav>
       </aside>
 
       <main class="main-content">
         <section id="view-dashboard" class="view-panel active">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Visão Geral</h2>
-            <button type="button" id="mt-btn-atualizar-dados" class="btn btn-outline btn-sm">Sincronizar Dados</button>
+            <button type="button" id="mt-btn-atualizar-dados" class="btn btn-primary btn-sm">Sincronizar Dados</button>
           </div>
 
-          <div class="kpi-grid">
-            <article class="kpi-card">
-              <span>Clientes Cadastrados</span>
-              <strong id="kpi-clientes">0</strong>
+          <div class="metrics-grid">
+            <article class="metric-card">
+              <div class="metric-title">Clientes Cadastrados</div>
+              <div id="kpi-clientes" class="metric-value">0</div>
             </article>
-            <article class="kpi-card">
-              <span>Serviços / Ordens</span>
-              <strong id="kpi-servicos">0</strong>
+            <article class="metric-card">
+              <div class="metric-title">Serviços / Ordens</div>
+              <div id="kpi-servicos" class="metric-value">0</div>
             </article>
-            <article class="kpi-card">
-              <span>Receitas (R$)</span>
-              <strong id="kpi-receitas">R$ 0,00</strong>
+            <article class="metric-card">
+              <div class="metric-title">Receitas (R$)</div>
+              <div id="kpi-receitas" class="metric-value">R$ 0,00</div>
             </article>
-            <article class="kpi-card">
-              <span>Saldo Líquido (R$)</span>
-              <strong id="kpi-saldo">R$ 0,00</strong>
+            <article class="metric-card">
+              <div class="metric-title">Saldo Líquido (R$)</div>
+              <div id="kpi-saldo" class="metric-value">R$ 0,00</div>
             </article>
           </div>
 
-          <div class="card">
-            <h3>Resumo Financeiro Visual</h3>
-            <div id="mt-dash-grafico"></div>
-          </div>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Resumo Financeiro Visual</h3>
+              <div id="mt-dash-grafico" class="chart-container"></div>
+            </div>
 
-          <div class="card">
-            <h3>Acesso Rápido e Atalho no Dispositivo</h3>
-            <p class="muted-text">
-              Para instalar ou criar atalho na tela inicial: no Chrome/Edge use o botão <strong>Instalar App</strong> ou o menu <strong>Instalar aplicativo / Adicionar à tela inicial</strong>. No iPhone/iPad (Safari), toque em <strong>Compartilhar</strong> e <strong>Adicionar à Tela de Início</strong>.
-            </p>
+            <div class="activity-card">
+              <h3>Acesso Rápido e Atalho</h3>
+              <div class="activity-item">
+                <span>Chrome / Edge: use <strong>Instalar App</strong> ou <strong>Adicionar à tela inicial</strong>.</span>
+              </div>
+              <div class="activity-item">
+                <span>iPhone / iPad (Safari): toque em <strong>Compartilhar</strong> e <strong>Adicionar à Tela de Início</strong>.</span>
+              </div>
+            </div>
           </div>
         </section>
 
         <section id="view-clientes" class="view-panel">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Clientes</h2>
           </div>
 
@@ -157,7 +164,7 @@
         </section>
 
         <section id="view-servicos" class="view-panel">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Serviços &amp; Pedidos</h2>
           </div>
 
@@ -191,7 +198,7 @@
         </section>
 
         <section id="view-financeiro" class="view-panel">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Financeiro &amp; Gráfico</h2>
           </div>
 
@@ -225,7 +232,7 @@
         </section>
 
         <section id="view-equipe" class="view-panel">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Equipe &amp; Operadores</h2>
           </div>
 
@@ -259,7 +266,7 @@
         </section>
 
         <section id="view-montagem-equipes" class="view-panel">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Montagem de Equipes</h2>
           </div>
 
@@ -289,7 +296,7 @@
         </section>
 
         <section id="view-planos" class="view-panel">
-          <div class="panel-head">
+          <div class="section-header">
             <h2>Planos &amp; Licenças</h2>
           </div>
 
