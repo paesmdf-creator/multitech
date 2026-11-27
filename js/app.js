@@ -20,6 +20,7 @@ import { auth, db } from "./firebase-config.js";
 const ROOT_COLLECTION = "multitech_empresas";
 const DEMO_EMPRESA_ID = "admin_geral_multitech";
 const STORAGE_EMPRESA_KEY = "multitech_nome_empresa_custom";
+const STORAGE_DIVULGACAO_KEY = "multitech_divulgacao_v1";
 
 const PLANOS_CATALOGO = [
   {
@@ -117,6 +118,10 @@ function obterNomeEmpresaSalvo() {
   }
 }
 
+function getNomeEmpresaAtual() {
+  return obterNomeEmpresaSalvo() || empresaNomeEl?.textContent?.trim() || "Multitech";
+}
+
 function aplicarNomeEmpresaNaTela(nomePadrao) {
   if (!empresaNomeEl) return;
   const salvo = obterNomeEmpresaSalvo();
@@ -150,9 +155,378 @@ function garantirBotaoEditarEmpresa() {
       { nomeEmpresa: limpo, atualizadoEm: new Date().toISOString() },
       { merge: true }
     ).catch(() => {});
+
+    renderSecoesDivulgacao();
   });
 
   empresaNomeEl.insertAdjacentElement("afterend", btnEditar);
+}
+
+function carregarEstadoDivulgacao() {
+  const padrao = {
+    whatsappNumero: "",
+    portfolioDescricao: "Atendimento profissional, serviços sob medida e suporte direto para clientes.",
+    portfolioItens: [
+      { id: "p1", titulo: "Atendimento & Orçamento", resumo: "Diagnóstico rápido e proposta clara para o cliente." },
+      { id: "p2", titulo: "Execução & Acompanhamento", resumo: "Equipe organizada com acompanhamento de etapas e prazos." }
+    ],
+    galeriaItens: [
+      {
+        id: "g1",
+        titulo: "Post Divulgação - Serviços",
+        legenda: "Agende seu atendimento de forma rápida e confirme direto no WhatsApp.",
+        imagemUrl: ""
+      }
+    ]
+  };
+
+  try {
+    const raw = localStorage.getItem(STORAGE_DIVULGACAO_KEY);
+    if (!raw) return padrao;
+    const parsed = JSON.parse(raw);
+    return {
+      whatsappNumero: String(parsed.whatsappNumero || ""),
+      portfolioDescricao: String(parsed.portfolioDescricao || padrao.portfolioDescricao),
+      portfolioItens: Array.isArray(parsed.portfolioItens) && parsed.portfolioItens.length
+        ? parsed.portfolioItens
+        : padrao.portfolioItens,
+      galeriaItens: Array.isArray(parsed.galeriaItens) && parsed.galeriaItens.length
+        ? parsed.galeriaItens
+        : padrao.galeriaItens
+    };
+  } catch (_) {
+    return padrao;
+  }
+}
+
+function salvarEstadoDivulgacao(estado) {
+  try {
+    localStorage.setItem(STORAGE_DIVULGACAO_KEY, JSON.stringify(estado));
+  } catch (_) {}
+}
+
+function limparTelefoneWhatsApp(num) {
+  const digits = String(num || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
+function garantirSecoesDivulgacao() {
+  const navList = sidebarEl?.querySelector(".nav-list");
+  const mainContent = document.querySelector(".main-content");
+  if (!navList || !mainContent) return;
+
+  const extras = [
+    {
+      view: "portfolio",
+      label: "Portfólio Divulgação",
+      titulo: "Portfólio para Divulgação",
+      html: `
+        <div class="card">
+          <h3>Apresentação Pública da Empresa</h3>
+          <div class="form-grid">
+            <label class="field">
+              <span>Resumo do Portfólio</span>
+              <input type="text" id="mt-port-desc" placeholder="Descrição breve para divulgar" />
+            </label>
+            <div class="form-actions">
+              <button type="button" id="mt-btn-salvar-port-desc" class="btn btn-primary">Salvar Descrição</button>
+            </div>
+          </div>
+          <p class="muted-text" style="margin-top:10px;">
+            Link direto desta página: <strong id="mt-link-divulgacao-atual"></strong>
+          </p>
+        </div>
+
+        <form id="mt-form-portfolio-item" class="card form-grid">
+          <label class="field">
+            <span>Título do Destaque / Serviço</span>
+            <input type="text" id="mt-port-item-titulo" required placeholder="Ex: Instalação e Manutenção" />
+          </label>
+          <label class="field">
+            <span>Detalhes para o Cliente</span>
+            <input type="text" id="mt-port-item-resumo" required placeholder="Ex: Atendimento agendado com confirmação" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Adicionar ao Portfólio</button>
+          </div>
+        </form>
+
+        <div id="mt-lista-portfolio" class="card table-wrap"></div>
+      `
+    },
+    {
+      view: "agendamento-whatsapp",
+      label: "Agendamento WhatsApp",
+      titulo: "Acesso do Cliente — Agendamento via WhatsApp",
+      html: `
+        <div class="card">
+          <h3>Número WhatsApp da Empresa para Confirmação</h3>
+          <div class="form-grid">
+            <label class="field">
+              <span>WhatsApp com DDD (ex: 13999999999)</span>
+              <input type="tel" id="mt-wa-numero" placeholder="13999999999" />
+            </label>
+            <div class="form-actions">
+              <button type="button" id="mt-btn-salvar-wa" class="btn btn-primary">Salvar WhatsApp</button>
+            </div>
+          </div>
+        </div>
+
+        <form id="mt-form-agendamento-wa" class="card form-grid">
+          <label class="field">
+            <span>Nome do Cliente Final</span>
+            <input type="text" id="mt-ag-cliente" required placeholder="Nome do cliente" />
+          </label>
+          <label class="field">
+            <span>Serviço Desejado</span>
+            <input type="text" id="mt-ag-servico" required placeholder="Ex: Avaliação / Orçamento" />
+          </label>
+          <label class="field">
+            <span>Data e Horário Preferido</span>
+            <input type="text" id="mt-ag-datahora" required placeholder="Ex: Amanhã às 14h" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Gerar e Confirmar no WhatsApp</button>
+          </div>
+        </form>
+
+        <div id="mt-resultado-wa" class="card"></div>
+      `
+    },
+    {
+      view: "galeria-redes",
+      label: "Galeria Redes Sociais",
+      titulo: "Galeria de Imagens para Redes Sociais",
+      html: `
+        <form id="mt-form-galeria" class="card form-grid">
+          <label class="field">
+            <span>Título da Arte / Post</span>
+            <input type="text" id="mt-gal-titulo" required placeholder="Ex: Promoção da Semana" />
+          </label>
+          <label class="field">
+            <span>URL da Imagem (opcional)</span>
+            <input type="url" id="mt-gal-url" placeholder="https://..." />
+          </label>
+          <label class="field">
+            <span>Legenda Pronta para Copiar</span>
+            <input type="text" id="mt-gal-legenda" required placeholder="Texto para Instagram, Facebook ou WhatsApp" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Adicionar à Galeria</button>
+          </div>
+        </form>
+
+        <div id="mt-grid-galeria" class="plans-grid"></div>
+      `
+    }
+  ];
+
+  for (const item of extras) {
+    if (!navList.querySelector(`[data-view="${item.view}"]`)) {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "nav-item";
+      btn.dataset.view = item.view;
+      btn.textContent = item.label;
+      btn.addEventListener("click", () => alternarView(item.view));
+      li.appendChild(btn);
+      navList.appendChild(li);
+    }
+
+    if (!document.getElementById(`view-${item.view}`)) {
+      const sec = document.createElement("section");
+      sec.id = `view-${item.view}`;
+      sec.className = "view-panel";
+      sec.innerHTML = `
+        <div class="section-header">
+          <h2>${esc(item.titulo)}</h2>
+        </div>
+        ${item.html}
+      `;
+      mainContent.appendChild(sec);
+    }
+  }
+
+  document.getElementById("mt-btn-salvar-port-desc")?.addEventListener("click", () => {
+    const estado = carregarEstadoDivulgacao();
+    estado.portfolioDescricao =
+      document.getElementById("mt-port-desc")?.value.trim() || estado.portfolioDescricao;
+    salvarEstadoDivulgacao(estado);
+    renderSecoesDivulgacao();
+  });
+
+  document.getElementById("mt-form-portfolio-item")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const titulo = document.getElementById("mt-port-item-titulo")?.value.trim() || "";
+    const resumo = document.getElementById("mt-port-item-resumo")?.value.trim() || "";
+    if (!titulo || !resumo) return;
+    const estado = carregarEstadoDivulgacao();
+    estado.portfolioItens.push({
+      id: `p_${Date.now()}`,
+      titulo,
+      resumo
+    });
+    salvarEstadoDivulgacao(estado);
+    e.target.reset();
+    renderSecoesDivulgacao();
+  });
+
+  document.getElementById("mt-btn-salvar-wa")?.addEventListener("click", () => {
+    const estado = carregarEstadoDivulgacao();
+    estado.whatsappNumero = document.getElementById("mt-wa-numero")?.value.trim() || "";
+    salvarEstadoDivulgacao(estado);
+    renderSecoesDivulgacao();
+  });
+
+  document.getElementById("mt-form-agendamento-wa")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const cliente = document.getElementById("mt-ag-cliente")?.value.trim() || "";
+    const servico = document.getElementById("mt-ag-servico")?.value.trim() || "";
+    const datahora = document.getElementById("mt-ag-datahora")?.value.trim() || "";
+    if (!cliente || !servico || !datahora) return;
+
+    const estado = carregarEstadoDivulgacao();
+    const fone = limparTelefoneWhatsApp(estado.whatsappNumero);
+    const empresa = getNomeEmpresaAtual();
+    const texto = `Olá *${empresa}*, sou *${cliente}*. Gostaria de agendar *${servico}* para *${datahora}* e confirmar meu horário.`;
+    const waUrl = fone
+      ? `https://wa.me/${fone}?text=${encodeURIComponent(texto)}`
+      : `https://wa.me/?text=${encodeURIComponent(texto)}`;
+
+    const resEl = document.getElementById("mt-resultado-wa");
+    if (resEl) {
+      resEl.innerHTML = `
+        <h3>Solicitação Pronta para Confirmação</h3>
+        <p class="muted-text" style="margin-bottom:10px;">
+          Cliente: <strong>${esc(cliente)}</strong> | Serviço: <strong>${esc(servico)}</strong> | Horário: <strong>${esc(datahora)}</strong>
+        </p>
+        <a href="${esc(waUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+          Abrir WhatsApp para Confirmar Horário
+        </a>
+      `;
+    }
+  });
+
+  document.getElementById("mt-form-galeria")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const titulo = document.getElementById("mt-gal-titulo")?.value.trim() || "";
+    const imagemUrl = document.getElementById("mt-gal-url")?.value.trim() || "";
+    const legenda = document.getElementById("mt-gal-legenda")?.value.trim() || "";
+    if (!titulo || !legenda) return;
+
+    const estado = carregarEstadoDivulgacao();
+    estado.galeriaItens.push({
+      id: `g_${Date.now()}`,
+      titulo,
+      imagemUrl,
+      legenda
+    });
+    salvarEstadoDivulgacao(estado);
+    e.target.reset();
+    renderSecoesDivulgacao();
+  });
+
+  document.addEventListener("click", (e) => {
+    const delPort = e.target.closest("[data-del-port]");
+    if (delPort) {
+      const id = delPort.dataset.delPort;
+      const estado = carregarEstadoDivulgacao();
+      estado.portfolioItens = estado.portfolioItens.filter((x) => x.id !== id);
+      salvarEstadoDivulgacao(estado);
+      renderSecoesDivulgacao();
+      return;
+    }
+
+    const delGal = e.target.closest("[data-del-gal]");
+    if (delGal) {
+      const id = delGal.dataset.delGal;
+      const estado = carregarEstadoDivulgacao();
+      estado.galeriaItens = estado.galeriaItens.filter((x) => x.id !== id);
+      salvarEstadoDivulgacao(estado);
+      renderSecoesDivulgacao();
+      return;
+    }
+
+    const copyBtn = e.target.closest("[data-copy-legenda]");
+    if (copyBtn) {
+      const txt = copyBtn.dataset.copyLegenda || "";
+      navigator.clipboard?.writeText(txt).catch(() => {});
+      copyBtn.textContent = "Legenda copiada";
+      setTimeout(() => {
+        copyBtn.textContent = "Copiar legenda";
+      }, 1500);
+    }
+  });
+}
+
+function renderSecoesDivulgacao() {
+  const estado = carregarEstadoDivulgacao();
+  const empresa = getNomeEmpresaAtual();
+
+  const descInput = document.getElementById("mt-port-desc");
+  if (descInput && document.activeElement !== descInput) {
+    descInput.value = estado.portfolioDescricao;
+  }
+
+  const linkEl = document.getElementById("mt-link-divulgacao-atual");
+  if (linkEl) {
+    linkEl.textContent = `${window.location.origin}${window.location.pathname}`;
+  }
+
+  const listaPortEl = document.getElementById("mt-lista-portfolio");
+  if (listaPortEl) {
+    listaPortEl.innerHTML = `
+      <p class="muted-text" style="margin-bottom:12px;">
+        <strong>${esc(empresa)}:</strong> ${esc(estado.portfolioDescricao)}
+      </p>
+      <table>
+        <thead><tr><th>Destaque / Serviço</th><th>Descrição</th><th>Ação</th></tr></thead>
+        <tbody>
+          ${estado.portfolioItens
+            .map(
+              (it) => `<tr>
+                <td><strong>${esc(it.titulo)}</strong></td>
+                <td>${esc(it.resumo)}</td>
+                <td><button type="button" class="btn btn-outline btn-sm" data-del-port="${esc(it.id)}">Excluir</button></td>
+              </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  const waInput = document.getElementById("mt-wa-numero");
+  if (waInput && document.activeElement !== waInput) {
+    waInput.value = estado.whatsappNumero;
+  }
+
+  const gridGalEl = document.getElementById("mt-grid-galeria");
+  if (gridGalEl) {
+    gridGalEl.innerHTML = estado.galeriaItens
+      .map((card) => {
+        const preview = card.imagemUrl
+          ? `<img src="${esc(card.imagemUrl)}" alt="${esc(card.titulo)}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:10px;border:1px solid var(--borda);" />`
+          : `<div style="width:100%;height:120px;border-radius:10px;margin-bottom:10px;background:var(--azul-fundo);border:1px solid var(--borda);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--azul-texto);padding:10px;text-align:center;">${esc(empresa)} — ${esc(card.titulo)}</div>`;
+
+        return `
+          <article class="plan-card">
+            <div>
+              ${preview}
+              <h3>${esc(card.titulo)}</h3>
+              <p class="muted-text">${esc(card.legenda)}</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" data-copy-legenda="${esc(card.legenda)}">Copiar legenda</button>
+              <button type="button" class="btn btn-outline btn-sm" data-del-gal="${esc(card.id)}">Excluir</button>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
 }
 
 function alternarAbaAuth(modo) {
@@ -183,6 +557,8 @@ function abrirPainelDireto(empresaId, nomeEmpresa, emailEmpresa, planoId) {
 
   aplicarNomeEmpresaNaTela(nomeEmpresa || "Multitech");
   garantirBotaoEditarEmpresa();
+  garantirSecoesDivulgacao();
+  renderSecoesDivulgacao();
 
   if (empresaEmailEl) empresaEmailEl.textContent = emailEmpresa || "Administrador Geral";
   if (operadorBadgeEl) operadorBadgeEl.textContent = "Administrador Geral";
