@@ -3,374 +3,273 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multitech — Gestão Empresarial</title>
   <meta name="theme-color" content="#0f172a" />
+  <title>Multitech — Gestão para Pequenos Negócios</title>
+  <link rel="manifest" href="./manifest.json" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-  <!-- TELA DE LOGIN / CADASTRO DA EMPRESA (FIREBASE AUTH) -->
-  <div id="auth-screen" class="auth-screen">
+  <section id="mt-auth-screen" class="auth-wrapper">
     <div class="auth-card">
-      <div class="auth-brand">
+      <div class="brand-header">
         <div class="brand-logo">MT</div>
         <div>
-          <h1 id="auth-brand-title">Multitech</h1>
-          <p id="auth-brand-sub">Sistema de gestão para pequenos negócios e equipes</p>
+          <h1>Multitech</h1>
+          <p class="muted-text">Sistema de gestão para pequenos negócios e equipes</p>
         </div>
       </div>
 
-      <div class="auth-tabs">
-        <button type="button" id="tab-login" class="auth-tab active">Entrar</button>
-        <button type="button" id="tab-register" class="auth-tab">Criar Conta</button>
-        <button type="button" id="tab-plans-public" class="auth-tab">Ver Planos</button>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" id="mt-tab-login" class="tab-btn active">Entrar</button>
+        <button type="button" id="mt-tab-register" class="tab-btn">Criar Conta</button>
       </div>
 
-      <form id="auth-form" class="auth-form">
-        <div id="campo-nome-empresa" class="form-group hidden">
-          <label for="auth-empresa">Nome da Empresa</label>
-          <input type="text" id="auth-empresa" placeholder="Ex: Studio Silva" />
-        </div>
-
-        <div id="campo-plano-inicial" class="form-group hidden">
-          <label for="auth-plano">Plano Inicial</label>
-          <select id="auth-plano">
-            <option value="starter">Starter — R$ 39,90/mês</option>
-            <option value="profissional">Profissional — R$ 59,90/mês</option>
-            <option value="empresarial">Empresarial — R$ 89,90/mês</option>
-            <option value="premium">Premium — R$ 129,90/mês</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="auth-email">E-mail da Empresa</label>
-          <input type="email" id="auth-email" required placeholder="contato@empresa.com" />
-        </div>
-
-        <div class="form-group">
-          <label for="auth-password">Senha</label>
-          <input type="password" id="auth-password" required placeholder="••••••••" />
-        </div>
-
-        <button type="submit" id="auth-submit-btn" class="btn btn-primary full-width">Acessar Sistema</button>
-        <p id="auth-error" class="error-text"></p>
+      <form id="mt-form-login" class="stack-form">
+        <label class="field">
+          <span>E-mail da Empresa</span>
+          <input type="email" id="mt-login-email" required placeholder="empresa@exemplo.com" />
+        </label>
+        <label class="field">
+          <span>Senha</span>
+          <input type="password" id="mt-login-senha" required placeholder="••••••••" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-full">Acessar Sistema</button>
       </form>
 
-      <div id="public-plans-view" class="hidden">
-        <p class="muted-text">Confira as especificações completas de cada plano antes de contratar:</p>
-        <div id="vitrine-planos-publica" class="planos-grid"></div>
-      </div>
+      <form id="mt-form-register" class="stack-form hidden">
+        <label class="field">
+          <span>Nome da Empresa</span>
+          <input type="text" id="mt-reg-empresa" required placeholder="Ex: Multitech Soluções" />
+        </label>
+        <label class="field">
+          <span>E-mail</span>
+          <input type="email" id="mt-reg-email" required placeholder="empresa@exemplo.com" />
+        </label>
+        <label class="field">
+          <span>Senha (mínimo 6 caracteres)</span>
+          <input type="password" id="mt-reg-senha" required minlength="6" placeholder="••••••••" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-full">Criar Conta e Acessar</button>
+      </form>
+
+      <p id="mt-auth-erro" class="error-text" role="alert"></p>
     </div>
-  </div>
+  </section>
 
-  <!-- APLICAÇÃO PRINCIPAL (APÓS LOGIN DA EMPRESA) -->
-  <div id="app-shell" class="app-shell hidden">
-    <aside id="sidebar" class="sidebar">
-      <div class="sidebar-header">
-        <div class="brand-logo small">MT</div>
-        <div>
-          <strong id="empresa-nome-sidebar">Multitech</strong>
-          <small id="empresa-plano-sidebar">Plano Starter</small>
+  <div id="mt-app-shell" class="app-shell hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" id="mt-btn-menu" class="btn btn-outline btn-sm mobile-only">Menu</button>
+        <div class="brand-compact">
+          <span class="brand-logo sm">MT</span>
+          <div>
+            <strong id="mt-empresa-nome">Multitech</strong>
+            <small id="mt-empresa-email" class="muted-text"></small>
+          </div>
         </div>
       </div>
 
-      <nav class="nav-menu">
-        <button type="button" class="nav-item active" data-view="dashboard" data-modulo="clientes">
-          <span>📊</span> Dashboard
-        </button>
-        <button type="button" class="nav-item" data-view="clientes" data-modulo="clientes">
-          <span>👥</span> Clientes
-        </button>
-        <button type="button" class="nav-item" data-view="servicos" data-modulo="servicos">
-          <span>🛠️</span> Serviços
-        </button>
-        <button type="button" class="nav-item" data-view="agenda" data-modulo="agenda">
-          <span>📅</span> Agenda
-        </button>
-        <button type="button" class="nav-item" data-view="portfolio" data-modulo="portfolio">
-          <span>🖼️</span> Portfólio & Página
-        </button>
-        <button type="button" class="nav-item" data-view="financeiro" data-modulo="financeiro_basico">
-          <span>💰</span> Financeiro
-        </button>
-        <button type="button" class="nav-item" data-view="relatorios" data-modulo="relatorios_financeiros">
-          <span>📈</span> Relatórios
-        </button>
-        <button type="button" class="nav-item" data-view="equipe" data-modulo="gestao_usuarios">
-          <span>🔐</span> Equipe e Perfis
-        </button>
-        <button type="button" class="nav-item" data-view="planos" data-modulo="clientes">
-          <span>💎</span> Planos
-        </button>
-        <button type="button" class="nav-item" data-view="configuracoes" data-modulo="clientes">
-          <span>⚙️</span> Configurações
-        </button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <button type="button" id="btn-logout-empresa" class="btn btn-outline full-width">Sair da Conta</button>
+      <div class="topbar-right">
+        <span id="mt-operador-atual-badge" class="badge">Administrador</span>
+        <button type="button" id="mt-btn-trocar-operador" class="btn btn-outline btn-sm hidden">Trocar</button>
+        <button type="button" id="mt-btn-instalar" class="btn btn-accent btn-sm hidden">Instalar App</button>
+        <button type="button" id="mt-btn-sair" class="btn btn-outline btn-sm">Sair</button>
       </div>
-    </aside>
+    </header>
 
-    <div class="main-column">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button type="button" id="btn-toggle-menu" class="icon-btn">☰</button>
-          <h2 id="page-title">Dashboard</h2>
-        </div>
+    <div class="app-body">
+      <aside id="mt-sidebar" class="sidebar">
+        <nav class="nav-list">
+          <button type="button" class="nav-item active" data-view="dashboard">Dashboard</button>
+          <button type="button" class="nav-item" data-view="clientes">Clientes</button>
+          <button type="button" class="nav-item" data-view="servicos">Serviços &amp; Pedidos</button>
+          <button type="button" class="nav-item" data-view="financeiro">Financeiro</button>
+          <button type="button" class="nav-item" data-view="equipe">Equipe &amp; Operadores</button>
+        </nav>
+      </aside>
 
-        <div class="topbar-right">
-          <span id="mt-operador-atual-badge" class="operador-badge">Carregando...</span>
-          <button type="button" id="mt-btn-trocar-operador" class="btn btn-secondary btn-sm hidden">
-            Trocar operador
-          </button>
-        </div>
-      </header>
+      <main class="main-content">
+        <section id="view-dashboard" class="view-panel active">
+          <div class="panel-head">
+            <h2>Visão Geral</h2>
+            <button type="button" id="mt-btn-atualizar-dados" class="btn btn-outline btn-sm">Sincronizar Dados</button>
+          </div>
 
-      <main class="content-area">
-        <!-- VIEW: DASHBOARD -->
-        <section id="view-dashboard" class="view-section active">
           <div class="kpi-grid">
-            <div class="kpi-card">
-              <span>Clientes cadastrados</span>
+            <article class="kpi-card">
+              <span>Clientes Cadastrados</span>
               <strong id="kpi-clientes">0</strong>
-            </div>
-            <div class="kpi-card">
-              <span>Atendimentos na agenda</span>
-              <strong id="kpi-agenda">0</strong>
-            </div>
-            <div class="kpi-card" data-modulo="financeiro_basico">
-              <span>Entradas</span>
-              <strong id="kpi-entradas">R$ 0,00</strong>
-            </div>
-            <div class="kpi-card" data-modulo="financeiro_basico">
-              <span>Saldo</span>
+            </article>
+            <article class="kpi-card">
+              <span>Serviços / Ordens</span>
+              <strong id="kpi-servicos">0</strong>
+            </article>
+            <article class="kpi-card">
+              <span>Receitas (R$)</span>
+              <strong id="kpi-receitas">R$ 0,00</strong>
+            </article>
+            <article class="kpi-card">
+              <span>Saldo Líquido (R$)</span>
               <strong id="kpi-saldo">R$ 0,00</strong>
-            </div>
+            </article>
           </div>
 
           <div class="card">
-            <h3>Resumo operacional</h3>
-            <p id="resumo-operacional-texto" class="muted-text">
-              Acompanhe os registros da empresa e os lançamentos por usuário interno.
-            </p>
-            <div id="dashboard-ultimos-atendimentos"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: CLIENTES -->
-        <section id="view-clientes" class="view-section hidden" data-modulo="clientes">
-          <div class="card">
-            <h3>Novo Cliente</h3>
-            <form id="form-cliente" class="grid-form">
-              <input type="text" id="cliente-nome" placeholder="Nome completo" required />
-              <input type="text" id="cliente-telefone" placeholder="Telefone / WhatsApp" required />
-              <input type="email" id="cliente-email" placeholder="E-mail (opcional)" />
-              <input type="text" id="cliente-observacoes" placeholder="Observações / histórico inicial" />
-              <button type="submit" class="btn btn-primary">Salvar Cliente</button>
-            </form>
-          </div>
-
-          <div class="card">
-            <h3>Lista de Clientes</h3>
-            <div id="lista-clientes" class="table-wrap"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: SERVIÇOS -->
-        <section id="view-servicos" class="view-section hidden" data-modulo="servicos">
-          <div class="card">
-            <h3>Novo Serviço</h3>
-            <form id="form-servico" class="grid-form">
-              <input type="text" id="servico-nome" placeholder="Nome do serviço" required />
-              <input type="number" step="0.01" id="servico-preco" placeholder="Valor (R$)" required />
-              <input type="number" id="servico-duracao" placeholder="Duração (min)" value="60" />
-              <input type="text" id="servico-descricao" placeholder="Descrição breve" />
-              <button type="submit" class="btn btn-primary">Salvar Serviço</button>
-            </form>
-          </div>
-
-          <div class="card">
-            <h3>Catálogo de Serviços</h3>
-            <div id="lista-servicos" class="table-wrap"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: AGENDA -->
-        <section id="view-agenda" class="view-section hidden" data-modulo="agenda">
-          <div class="card">
-            <h3>Novo Agendamento</h3>
-            <form id="form-agenda" class="grid-form">
-              <input type="text" id="agenda-cliente" placeholder="Nome do cliente" required />
-              <input type="text" id="agenda-servico" placeholder="Serviço" required />
-              <input type="datetime-local" id="agenda-data" required />
-              <input type="text" id="agenda-profissional" placeholder="Profissional responsável" data-modulo="agenda_por_profissional" />
-              <select id="agenda-status">
-                <option value="Agendado">Agendado</option>
-                <option value="Confirmado">Confirmado</option>
-                <option value="Concluído">Concluído</option>
-                <option value="Cancelado">Cancelado</option>
-              </select>
-              <button type="submit" class="btn btn-primary">Agendar</button>
-            </form>
-          </div>
-
-          <div class="card" data-modulo="agendamento_online">
-            <h3>Link de Agendamento Online</h3>
-            <p class="muted-text">Compartilhe este identificador da sua página comercial para clientes agendarem:</p>
-            <code id="link-agendamento-online" class="code-pill"></code>
-          </div>
-
-          <div class="card">
-            <h3>Atendimentos Agendados</h3>
-            <div id="lista-agenda" class="table-wrap"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: PORTFÓLIO E PÁGINA COMERCIAL -->
-        <section id="view-portfolio" class="view-section hidden" data-modulo="portfolio">
-          <div class="card">
-            <h3>Adicionar ao Portfólio Digital</h3>
-            <form id="form-portfolio" class="grid-form">
-              <input type="text" id="portfolio-titulo" placeholder="Título do trabalho ou projeto" required />
-              <input type="text" id="portfolio-categoria" placeholder="Categoria" required />
-              <input type="url" id="portfolio-imagem" placeholder="URL da imagem (opcional)" />
-              <input type="text" id="portfolio-descricao" placeholder="Descrição do resultado" />
-              <button type="submit" class="btn btn-primary">Publicar no Portfólio</button>
-            </form>
-          </div>
-
-          <div class="card" data-modulo="pagina_comercial">
-            <h3>Página Comercial Personalizada</h3>
-            <div class="grid-form">
-              <input type="text" id="pagina-slogan" placeholder="Slogan da sua página comercial" />
-              <input type="text" id="pagina-destaque" placeholder="Mensagem de destaque / promoção" />
-              <button type="button" id="btn-salvar-pagina" class="btn btn-secondary">Salvar Página Comercial</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Itens do Portfólio</h3>
-            <div id="lista-portfolio" class="cards-grid"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: FINANCEIRO -->
-        <section id="view-financeiro" class="view-section hidden" data-modulo="financeiro_basico">
-          <div class="card">
-            <h3>Lançamento Financeiro</h3>
-            <form id="form-financeiro" class="grid-form">
-              <select id="fin-tipo">
-                <option value="entrada">Receita / Entrada</option>
-                <option value="saida">Despesa / Saída</option>
-              </select>
-              <input type="text" id="fin-descricao" placeholder="Descrição" required />
-              <input type="number" step="0.01" id="fin-valor" placeholder="Valor (R$)" required />
-              <input type="date" id="fin-data" required />
-              <button type="submit" class="btn btn-primary">Registrar Lançamento</button>
-            </form>
-          </div>
-
-          <div class="card" data-modulo="fluxo_caixa">
-            <h3>Fluxo de Caixa e Planilha Mensal</h3>
-            <div id="resumo-fluxo-caixa" class="kpi-grid compact"></div>
-          </div>
-
-          <div class="card">
-            <h3>Lançamentos</h3>
-            <div id="lista-financeiro" class="table-wrap"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: RELATÓRIOS -->
-        <section id="view-relatorios" class="view-section hidden" data-modulo="relatorios_financeiros">
-          <div class="card">
-            <h3>Relatórios Financeiros</h3>
-            <div id="relatorio-financeiro-box"></div>
-          </div>
-
-          <div class="card" data-modulo="relatorios_desempenho">
-            <h3>Desempenho, Indicadores Comerciais e Produtividade</h3>
-            <div id="relatorio-desempenho-box"></div>
-          </div>
-
-          <div class="card" data-modulo="relatorios_comparativos">
-            <h3>Indicadores Gerenciais Avançados e Relatórios Comparativos (Premium)</h3>
-            <div id="relatorio-comparativo-box"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: EQUIPE E PERFIS INTERNOS (MESMO LOGIN DA EMPRESA) -->
-        <section id="view-equipe" class="view-section hidden">
-          <div id="mt-painel-gestao-operadores" class="card">
-            <h3>Cadastrar Usuário Interno (Mesmo Login da Empresa)</h3>
-            <p id="mt-resumo-limite-equipe" class="muted-text"></p>
-
-            <form id="mt-form-novo-operador" class="grid-form">
-              <input type="text" id="mt-op-nome" placeholder="Nome do operador" required />
-              <input type="text" id="mt-op-login" placeholder="Login interno (ex: carlos)" required />
-              <select id="mt-op-perfil"></select>
-              <input type="password" id="mt-op-pin" maxlength="6" placeholder="PIN interno (opcional)" />
-              <button type="submit" class="btn btn-primary">+ Adicionar Usuário</button>
-            </form>
-
-            <p id="mt-msg-equipe" class="helper-msg"></p>
-            <div id="mt-tabela-operadores" class="table-wrap"></div>
-          </div>
-
-          <div class="card">
-            <h3>Perfis Internos Disponíveis</h3>
-            <div id="guia-perfis-internos" class="cards-grid"></div>
-          </div>
-        </section>
-
-        <!-- VIEW: PLANOS E ESPECIFICAÇÕES -->
-        <section id="view-planos" class="view-section hidden">
-          <div class="card">
-            <h3>Planos Multitech — Especificações Completas</h3>
+            <h3>Acesso Rápido e Atalho no Dispositivo</h3>
             <p class="muted-text">
-              Veja os recursos e o limite de usuários internos no mesmo login de cada plano.
+              Para instalar ou criar atalho na tela inicial: no Chrome/Edge use o botão <strong>Instalar App</strong> (ou o menu do navegador <strong>Instalar aplicativo / Adicionar à tela inicial</strong>). No iPhone/iPad (Safari), toque em <strong>Compartilhar</strong> e <strong>Adicionar à Tela de Início</strong>.
             </p>
-            <div id="vitrine-planos-logada" class="planos-grid"></div>
           </div>
         </section>
 
-        <!-- VIEW: CONFIGURAÇÕES DA EMPRESA (WHITE-LABEL) -->
-        <section id="view-configuracoes" class="view-section hidden">
-          <div class="card">
-            <h3>Identidade da Empresa (White-Label)</h3>
-            <form id="form-config-empresa" class="grid-form">
-              <input type="text" id="cfg-nome-empresa" placeholder="Nome da empresa" required />
-              <input type="color" id="cfg-cor-primaria" value="#0f172a" title="Cor principal" />
-              <input type="text" id="cfg-telefone" placeholder="Telefone de contato" />
-              <input type="text" id="cfg-cidade" placeholder="Cidade / Estado" />
-              <button type="submit" class="btn btn-primary">Salvar Configurações</button>
-            </form>
-            <p id="cfg-msg" class="helper-msg"></p>
+        <section id="view-clientes" class="view-panel">
+          <div class="panel-head">
+            <h2>Clientes</h2>
           </div>
+
+          <form id="mt-form-cliente" class="card form-grid">
+            <label class="field">
+              <span>Nome / Razão Social</span>
+              <input type="text" id="mt-cli-nome" required placeholder="Nome do cliente" />
+            </label>
+            <label class="field">
+              <span>Telefone / WhatsApp</span>
+              <input type="text" id="mt-cli-telefone" placeholder="(13) 99999-9999" />
+            </label>
+            <label class="field">
+              <span>E-mail ou Observação</span>
+              <input type="text" id="mt-cli-obs" placeholder="Contato ou observação" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Salvar Cliente</button>
+            </div>
+          </form>
+
+          <div id="mt-lista-clientes" class="card table-wrap"></div>
+        </section>
+
+        <section id="view-servicos" class="view-panel">
+          <div class="panel-head">
+            <h2>Serviços &amp; Pedidos</h2>
+          </div>
+
+          <form id="mt-form-servico" class="card form-grid">
+            <label class="field">
+              <span>Descrição do Serviço / Pedido</span>
+              <input type="text" id="mt-srv-titulo" required placeholder="Ex: Manutenção preventiva" />
+            </label>
+            <label class="field">
+              <span>Cliente</span>
+              <input type="text" id="mt-srv-cliente" placeholder="Nome do cliente" />
+            </label>
+            <label class="field">
+              <span>Valor (R$)</span>
+              <input type="number" step="0.01" min="0" id="mt-srv-valor" placeholder="0.00" />
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select id="mt-srv-status">
+                <option value="Em andamento">Em andamento</option>
+                <option value="Concluído">Concluído</option>
+                <option value="Agendado">Agendado</option>
+              </select>
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Adicionar Serviço</button>
+            </div>
+          </form>
+
+          <div id="mt-lista-servicos" class="card table-wrap"></div>
+        </section>
+
+        <section id="view-financeiro" class="view-panel">
+          <div class="panel-head">
+            <h2>Financeiro</h2>
+          </div>
+
+          <form id="mt-form-lancamento" class="card form-grid">
+            <label class="field">
+              <span>Descrição</span>
+              <input type="text" id="mt-fin-desc" required placeholder="Ex: Pagamento de serviço" />
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <select id="mt-fin-tipo">
+                <option value="entrada">Entrada (Receita)</option>
+                <option value="saida">Saída (Despesa)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Valor (R$)</span>
+              <input type="number" step="0.01" min="0.01" id="mt-fin-valor" required placeholder="0.00" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Registrar Lançamento</button>
+            </div>
+          </form>
+
+          <div id="mt-lista-financeiro" class="card table-wrap"></div>
+        </section>
+
+        <section id="view-equipe" class="view-panel">
+          <div class="panel-head">
+            <h2>Equipe &amp; Operadores</h2>
+          </div>
+
+          <div class="card">
+            <p id="mt-resumo-limite-equipe" class="muted-text"></p>
+            <form id="mt-form-novo-operador" class="form-grid">
+              <label class="field">
+                <span>Nome do Operador</span>
+                <input type="text" id="mt-op-nome" required placeholder="Nome completo" />
+              </label>
+              <label class="field">
+                <span>Usuário / Login</span>
+                <input type="text" id="mt-op-login" required placeholder="ex: joao.silva" />
+              </label>
+              <label class="field">
+                <span>Perfil</span>
+                <select id="mt-op-perfil"></select>
+              </label>
+              <label class="field">
+                <span>PIN (opcional)</span>
+                <input type="text" id="mt-op-pin" maxlength="8" placeholder="Ex: 1234" />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Adicionar Operador</button>
+              </div>
+            </form>
+            <p id="mt-msg-equipe" class="muted-text"></p>
+          </div>
+
+          <div id="mt-tabela-operadores" class="card table-wrap"></div>
         </section>
       </main>
     </div>
   </div>
 
-  <!-- MODAL DE SELEÇÃO DE OPERADOR INTERNO -->
   <div id="mt-modal-operadores" class="modal-backdrop hidden">
     <div class="modal-card">
-      <h3>Quem está acessando?</h3>
-      <p class="muted-text">Selecione seu usuário interno dentro desta conta.</p>
-
-      <div id="mt-lista-operadores-login" class="operadores-list"></div>
-
-      <div id="mt-area-pin" class="hidden pin-box">
-        <label for="mt-input-pin">Digite seu PIN interno:</label>
-        <div class="pin-row">
-          <input type="password" id="mt-input-pin" maxlength="6" placeholder="••••" />
-          <button type="button" id="mt-btn-confirmar-pin" class="btn btn-primary">Entrar</button>
-        </div>
+      <h3>Selecionar Operador</h3>
+      <div id="mt-lista-operadores-login" class="op-list"></div>
+      <div id="mt-area-pin" class="pin-box hidden">
+        <label class="field">
+          <span>Digite o PIN do operador</span>
+          <input type="password" id="mt-input-pin" placeholder="PIN" />
+        </label>
+        <button type="button" id="mt-btn-confirmar-pin" class="btn btn-primary">Confirmar PIN</button>
         <p id="mt-erro-pin" class="error-text"></p>
       </div>
     </div>
   </div>
 
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
