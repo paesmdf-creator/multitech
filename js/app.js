@@ -30,7 +30,6 @@ import {
 import { GerenciadorOperadores } from "./operadores.js";
 import { renderizarVitrinePlanos } from "./vitrine-planos.js";
 
-// Coleções exclusivas do Multitech para não misturar com outros sistemas
 const ROOT_COLLECTION = "multitech_empresas";
 
 const authScreen = document.getElementById("auth-screen");
