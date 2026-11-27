@@ -1,564 +1,347 @@
-import { auth, db } from "./firebase-config.js";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 import {
   doc,
   getDoc,
   setDoc,
-  addDoc,
-  deleteDoc,
-  updateDoc,
   collection,
   getDocs,
-  query,
-  orderBy
+  addDoc,
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import {
-  PLANOS_MULTITECH,
-  PERFIS_INTERNOS,
-  obterPlano,
-  obterPerfisPermitidosNoPlano,
-  podeUsarModulo,
-  limiteOperadoresDoPlano
-} from "./planos-permissoes.js";
-
+import { auth, db } from "./firebase-config.js";
 import { GerenciadorOperadores } from "./operadores.js";
-import { renderizarVitrinePlanos } from "./vitrine-planos.js";
 
 const ROOT_COLLECTION = "multitech_empresas";
 
-const authScreen = document.getElementById("auth-screen");
-const appShell = document.getElementById("app-shell");
-const authForm = document.getElementById("auth-form");
-const authError = document.getElementById("auth-error");
-const authSubmitBtn = document.getElementById("auth-submit-btn");
+const authScreenEl = document.getElementById("mt-auth-screen");
+const appShellEl = document.getElementById("mt-app-shell");
+const tabLoginEl = document.getElementById("mt-tab-login");
+const tabRegisterEl = document.getElementById("mt-tab-register");
+const formLoginEl = document.getElementById("mt-form-login");
+const formRegisterEl = document.getElementById("mt-form-register");
+const authErroEl = document.getElementById("mt-auth-erro");
 
-const tabLogin = document.getElementById("tab-login");
-const tabRegister = document.getElementById("tab-register");
-const tabPlansPublic = document.getElementById("tab-plans-public");
-const publicPlansView = document.getElementById("public-plans-view");
-const campoNomeEmpresa = document.getElementById("campo-nome-empresa");
-const campoPlanoInicial = document.getElementById("campo-plano-inicial");
+const empresaNomeEl = document.getElementById("mt-empresa-nome");
+const empresaEmailEl = document.getElementById("mt-empresa-email");
+const btnSairEl = document.getElementById("mt-btn-sair");
+const btnMenuEl = document.getElementById("mt-btn-menu");
+const sidebarEl = document.getElementById("mt-sidebar");
+const btnInstalarEl = document.getElementById("mt-btn-instalar");
+const btnAtualizarEl = document.getElementById("mt-btn-atualizar-dados");
 
-const empresaNomeSidebar = document.getElementById("empresa-nome-sidebar");
-const empresaPlanoSidebar = document.getElementById("empresa-plano-sidebar");
-const pageTitle = document.getElementById("page-title");
-const sidebar = document.getElementById("sidebar");
-const btnToggleMenu = document.getElementById("btn-toggle-menu");
-const btnLogoutEmpresa = document.getElementById("btn-logout-empresa");
+const kpiClientesEl = document.getElementById("kpi-clientes");
+const kpiServicosEl = document.getElementById("kpi-servicos");
+const kpiReceitasEl = document.getElementById("kpi-receitas");
+const kpiSaldoEl = document.getElementById("kpi-saldo");
 
-let modoAuth = "login";
-let empresaAtualId = null;
-let dadosEmpresa = null;
-let gerenciadorOp = null;
+const formClienteEl = document.getElementById("mt-form-cliente");
+const listaClientesEl = document.getElementById("mt-lista-clientes");
 
-function formatarMoeda(valor) {
-  return Number(valor || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  });
-}
+const formServicoEl = document.getElementById("mt-form-servico");
+const listaServicosEl = document.getElementById("mt-lista-servicos");
 
-function escaparTexto(texto) {
-  return String(texto ?? "")
+const formLancamentoEl = document.getElementById("mt-form-lancamento");
+const listaFinanceiroEl = document.getElementById("mt-lista-financeiro");
+
+let currentUser = null;
+let gerenciadorOperadores = null;
+let deferredInstallPrompt = null;
+
+function esc(valor) {
+  return String(valor ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
 
-function empresaDocRef(uid) {
-  return doc(db, ROOT_COLLECTION, uid);
+function formatarMoeda(valor) {
+  const num = Number(valor) || 0;
+  return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function subColRef(uid, subnome) {
-  return collection(db, ROOT_COLLECTION, uid, subnome);
+function alternarAbaAuth(modo) {
+  const isLogin = modo === "login";
+  tabLoginEl?.classList.toggle("active", isLogin);
+  tabRegisterEl?.classList.toggle("active", !isLogin);
+  formLoginEl?.classList.toggle("hidden", !isLogin);
+  formRegisterEl?.classList.toggle("hidden", isLogin);
+  if (authErroEl) authErroEl.textContent = "";
 }
 
-function configurarAbasAuth(modo) {
-  modoAuth = modo;
-  authError.textContent = "";
-
-  tabLogin.classList.toggle("active", modo === "login");
-  tabRegister.classList.toggle("active", modo === "register");
-  tabPlansPublic.classList.toggle("active", modo === "plans");
-
-  const mostrarPlanosPublicos = modo === "plans";
-  publicPlansView.classList.toggle("hidden", !mostrarPlanosPublicos);
-  authForm.classList.toggle("hidden", mostrarPlanosPublicos);
-
-  if (!mostrarPlanosPublicos) {
-    const ehCadastro = modo === "register";
-    campoNomeEmpresa.classList.toggle("hidden", !ehCadastro);
-    campoPlanoInicial.classList.toggle("hidden", !ehCadastro);
-    document.getElementById("auth-empresa").required = ehCadastro;
-    authSubmitBtn.textContent = ehCadastro ? "Criar Conta da Empresa" : "Acessar Sistema";
-  } else {
-    renderizarVitrinePlanos({
-      containerId: "vitrine-planos-publica",
-      planoAtivoId: null,
-      modoPublico: true,
-      onSelecionarPlano: (planoId) => {
-        document.getElementById("auth-plano").value = planoId;
-        configurarAbasAuth("register");
-      }
-    });
-  }
+function alternarView(viewName) {
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === viewName);
+  });
+  document.querySelectorAll(".view-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.id === `view-${viewName}`);
+  });
+  sidebarEl?.classList.remove("open");
 }
 
-tabLogin.addEventListener("click", () => configurarAbasAuth("login"));
-tabRegister.addEventListener("click", () => configurarAbasAuth("register"));
-tabPlansPublic.addEventListener("click", () => configurarAbasAuth("plans"));
-
-authForm.addEventListener("submit", async (e) => {
+window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
-  authError.textContent = "";
-  authSubmitBtn.disabled = true;
+  deferredInstallPrompt = e;
+  btnInstalarEl?.classList.remove("hidden");
+});
 
-  const email = document.getElementById("auth-email").value.trim();
-  const senha = document.getElementById("auth-password").value;
+btnInstalarEl?.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  btnInstalarEl.classList.add("hidden");
+});
 
+tabLoginEl?.addEventListener("click", () => alternarAbaAuth("login"));
+tabRegisterEl?.addEventListener("click", () => alternarAbaAuth("register"));
+btnMenuEl?.addEventListener("click", () => sidebarEl?.classList.toggle("open"));
+
+document.querySelectorAll(".nav-item").forEach((btn) => {
+  btn.addEventListener("click", () => alternarView(btn.dataset.view));
+});
+
+formLoginEl?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (authErroEl) authErroEl.textContent = "";
+  const email = document.getElementById("mt-login-email")?.value.trim() || "";
+  const senha = document.getElementById("mt-login-senha")?.value || "";
   try {
-    if (modoAuth === "register") {
-      const nomeEmpresa = document.getElementById("auth-empresa").value.trim();
-      const planoId = document.getElementById("auth-plano").value;
-
-      const cred = await createUserWithEmailAndPassword(auth, email, senha);
-      await setDoc(empresaDocRef(cred.user.uid), {
-        sistema: "multitech",
-        nomeEmpresa,
-        email,
-        planoId,
-        corPrimaria: "#0f172a",
-        telefone: "",
-        cidade: "",
-        slogan: "",
-        destaque: "",
-        criadoEm: new Date().toISOString()
-      });
-    } else {
-      await signInWithEmailAndPassword(auth, email, senha);
-    }
+    await signInWithEmailAndPassword(auth, email, senha);
   } catch (err) {
-    authError.textContent = "Falha na autenticação: " + (err?.message || "verifique e-mail e senha.");
-  } finally {
-    authSubmitBtn.disabled = false;
+    if (authErroEl) authErroEl.textContent = `Falha ao entrar: ${err.message}`;
   }
 });
 
-btnLogoutEmpresa.addEventListener("click", async () => {
-  if (gerenciadorOp) {
-    gerenciadorOp.limparSessaoOperador();
+formRegisterEl?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (authErroEl) authErroEl.textContent = "";
+  const nomeEmpresa = document.getElementById("mt-reg-empresa")?.value.trim() || "Minha Empresa";
+  const email = document.getElementById("mt-reg-email")?.value.trim() || "";
+  const senha = document.getElementById("mt-reg-senha")?.value || "";
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, senha);
+    await setDoc(
+      doc(db, ROOT_COLLECTION, cred.user.uid),
+      {
+        nomeEmpresa,
+        email,
+        planoId: "enterprise",
+        atualizadoEm: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    if (authErroEl) authErroEl.textContent = `Falha ao criar conta: ${err.message}`;
   }
+});
+
+btnSairEl?.addEventListener("click", async () => {
+  gerenciadorOperadores?.limparSessaoOperador();
   await signOut(auth);
 });
 
-btnToggleMenu.addEventListener("click", () => {
-  sidebar.classList.toggle("open");
+btnAtualizarEl?.addEventListener("click", async () => {
+  if (currentUser) {
+    await carregarTodosDados(currentUser.uid);
+  }
 });
 
-document.querySelectorAll(".nav-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const view = btn.dataset.view;
-    const modulo = btn.dataset.modulo;
-
-    if (modulo && !podeUsarModulo(dadosEmpresa?.planoId, modulo)) {
-      alert("Este recurso não está incluído no plano atual da empresa. Veja a aba Planos.");
-      return;
-    }
-
-    ativarView(view, btn);
-    sidebar.classList.remove("open");
-  });
-});
-
-function ativarView(viewName, botaoAtivo = null) {
-  document.querySelectorAll(".view-section").forEach((sec) => {
-    sec.classList.add("hidden");
-    sec.classList.remove("active");
-  });
-
-  const alvo = document.getElementById(`view-${viewName}`);
-  if (alvo) {
-    alvo.classList.remove("hidden");
-    alvo.classList.add("active");
+async function garantirDocumentoEmpresa(user) {
+  const ref = doc(db, ROOT_COLLECTION, user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    const payload = {
+      nomeEmpresa: "Multitech Empresa",
+      email: user.email || "",
+      planoId: "enterprise",
+      criadoEm: new Date().toISOString()
+    };
+    await setDoc(ref, payload, { merge: true });
+    return payload;
   }
-
-  document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
-  if (botaoAtivo) {
-    botaoAtivo.classList.add("active");
-  } else {
-    const btnCorrespondente = document.querySelector(`.nav-item[data-view="${viewName}"]`);
-    if (btnCorrespondente) btnCorrespondente.classList.add("active");
+  const data = snap.data();
+  if (!data.planoId) {
+    await setDoc(ref, { planoId: "enterprise" }, { merge: true });
+    data.planoId = "enterprise";
   }
-
-  const titulos = {
-    dashboard: "Dashboard",
-    clientes: "Clientes",
-    servicos: "Serviços",
-    agenda: "Agenda",
-    portfolio: "Portfólio & Página",
-    financeiro: "Financeiro",
-    relatorios: "Relatórios",
-    equipe: "Equipe e Perfis",
-    planos: "Planos",
-    configuracoes: "Configurações"
-  };
-  pageTitle.textContent = titulos[viewName] || "Multitech";
+  return data;
 }
 
-function aplicarPermissoesNaInterface() {
-  const planoId = dadosEmpresa?.planoId || "starter";
-  const plano = obterPlano(planoId);
-
-  empresaNomeSidebar.textContent = dadosEmpresa?.nomeEmpresa || "Multitech";
-  empresaPlanoSidebar.textContent = `Plano ${plano.nome}`;
-
-  if (dadosEmpresa?.corPrimaria) {
-    document.documentElement.style.setProperty("--primary", dadosEmpresa.corPrimaria);
-  }
-
-  document.querySelectorAll("[data-modulo]").forEach((el) => {
-    if (el.classList.contains("nav-item")) return;
-    const mod = el.dataset.modulo;
-    const permitido = podeUsarModulo(planoId, mod);
-    el.classList.toggle("hidden", !permitido);
-  });
-
-  const linkAgendamento = document.getElementById("link-agendamento-online");
-  if (linkAgendamento && empresaAtualId) {
-    linkAgendamento.textContent = `${window.location.origin}${window.location.pathname}?empresa=${empresaAtualId}`;
-  }
-
-  renderizarGuiaPerfis();
-  renderizarVitrinePlanos({
-    containerId: "vitrine-planos-logada",
-    planoAtivoId: planoId,
-    modoPublico: false,
-    onSelecionarPlano: async (novoPlanoId) => {
-      if (!empresaAtualId) return;
-      await updateDoc(empresaDocRef(empresaAtualId), { planoId: novoPlanoId });
-      dadosEmpresa.planoId = novoPlanoId;
-      aplicarPermissoesNaInterface();
-      if (gerenciadorOp) {
-        await gerenciadorOp.atualizarPlano(novoPlanoId);
-      }
-      alert(`Plano atualizado para ${obterPlano(novoPlanoId).nome}.`);
-    }
-  });
+async function listarSubcolecao(empresaId, sub) {
+  const snap = await getDocs(collection(db, ROOT_COLLECTION, empresaId, sub));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-function renderizarGuiaPerfis() {
-  const container = document.getElementById("guia-perfis-internos");
-  if (!container) return;
-
-  const permitidos = obterPerfisPermitidosNoPlano(dadosEmpresa?.planoId || "starter");
-  container.innerHTML = Object.entries(PERFIS_INTERNOS)
-    .map(([chave, info]) => {
-      const liberado = permitidos.includes(chave);
-      return `
-        <div class="mini-card">
-          <strong>${escaparTexto(info.nome)}</strong>
-          <div class="muted-text">${liberado ? "Disponível no plano" : "Disponível em planos superiores"}</div>
-          <p style="margin:8px 0 0;font-size:13px;">${escaparTexto(info.descricao || "")}</p>
-        </div>
-      `;
-    })
-    .join("");
+function renderClientes(empresaId, itens) {
+  if (!listaClientesEl) return;
+  if (!itens.length) {
+    listaClientesEl.innerHTML = `<p class="muted-text">Nenhum cliente cadastrado ainda.</p>`;
+    return;
+  }
+  listaClientesEl.innerHTML = `<table><thead><tr><th>Nome</th><th>Telefone</th><th>Observação</th><th>Ação</th></tr></thead><tbody>${itens
+    .map(
+      (item) => `<tr>
+        <td>${esc(item.nome)}</td>
+        <td>${esc(item.telefone)}</td>
+        <td>${esc(item.obs)}</td>
+        <td><button type="button" class="btn btn-outline btn-sm" data-del-col="clientes" data-del-id="${esc(item.id)}">Excluir</button></td>
+      </tr>`
+    )
+    .join("")}</tbody></table>`;
 }
 
-async function carregarTodosDados() {
-  if (!empresaAtualId) return;
+function renderServicos(empresaId, itens) {
+  if (!listaServicosEl) return;
+  if (!itens.length) {
+    listaServicosEl.innerHTML = `<p class="muted-text">Nenhum serviço ou pedido registrado.</p>`;
+    return;
+  }
+  listaServicosEl.innerHTML = `<table><thead><tr><th>Serviço</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead><tbody>${itens
+    .map(
+      (item) => `<tr>
+        <td>${esc(item.titulo)}</td>
+        <td>${esc(item.cliente)}</td>
+        <td>${formatarMoeda(item.valor)}</td>
+        <td>${esc(item.status)}</td>
+        <td><button type="button" class="btn btn-outline btn-sm" data-del-col="servicos" data-del-id="${esc(item.id)}">Excluir</button></td>
+      </tr>`
+    )
+    .join("")}</tbody></table>`;
+}
 
-  const [clientesSnap, servicosSnap, agendaSnap, portfolioSnap, financeiroSnap] = await Promise.all([
-    getDocs(query(subColRef(empresaAtualId, "clientes"), orderBy("criadoEm", "desc"))).catch(() => getDocs(subColRef(empresaAtualId, "clientes"))),
-    getDocs(subColRef(empresaAtualId, "servicos")),
-    getDocs(subColRef(empresaAtualId, "agenda")),
-    getDocs(subColRef(empresaAtualId, "portfolio")),
-    getDocs(subColRef(empresaAtualId, "financeiro"))
+function renderFinanceiro(empresaId, itens) {
+  if (!listaFinanceiroEl) return;
+  if (!itens.length) {
+    listaFinanceiroEl.innerHTML = `<p class="muted-text">Nenhum lançamento financeiro registrado.</p>`;
+    return;
+  }
+  listaFinanceiroEl.innerHTML = `<table><thead><tr><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${itens
+    .map(
+      (item) => `<tr>
+        <td>${esc(item.descricao)}</td>
+        <td>${item.tipo === "saida" ? "Saída" : "Entrada"}</td>
+        <td>${formatarMoeda(item.valor)}</td>
+        <td><button type="button" class="btn btn-outline btn-sm" data-del-col="financeiro" data-del-id="${esc(item.id)}">Excluir</button></td>
+      </tr>`
+    )
+    .join("")}</tbody></table>`;
+}
+
+async function carregarTodosDados(empresaId) {
+  const [clientes, servicos, financeiro] = await Promise.all([
+    listarSubcolecao(empresaId, "clientes"),
+    listarSubcolecao(empresaId, "servicos"),
+    listarSubcolecao(empresaId, "financeiro")
   ]);
 
-  const clientes = clientesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const servicos = servicosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const agenda = agendaSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const portfolio = portfolioSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const financeiro = financeiroSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const receitas = financeiro
+    .filter((i) => i.tipo !== "saida")
+    .reduce((acc, i) => acc + (Number(i.valor) || 0), 0);
 
-  const entradas = financeiro
-    .filter((item) => item.tipo === "entrada")
-    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
   const saidas = financeiro
-    .filter((item) => item.tipo === "saida")
-    .reduce((acc, item) => acc + Number(item.valor || 0), 0);
-  const saldo = entradas - saidas;
+    .filter((i) => i.tipo === "saida")
+    .reduce((acc, i) => acc + (Number(i.valor) || 0), 0);
 
-  document.getElementById("kpi-clientes").textContent = String(clientes.length);
-  document.getElementById("kpi-agenda").textContent = String(agenda.length);
-  document.getElementById("kpi-entradas").textContent = formatarMoeda(entradas);
-  document.getElementById("kpi-saldo").textContent = formatarMoeda(saldo);
+  if (kpiClientesEl) kpiClientesEl.textContent = String(clientes.length);
+  if (kpiServicosEl) kpiServicosEl.textContent = String(servicos.length);
+  if (kpiReceitasEl) kpiReceitasEl.textContent = formatarMoeda(receitas);
+  if (kpiSaldoEl) kpiSaldoEl.textContent = formatarMoeda(receitas - saidas);
 
-  const ultimosBox = document.getElementById("dashboard-ultimos-atendimentos");
-  if (ultimosBox) {
-    ultimosBox.innerHTML = agenda.length
-      ? `<ul>${agenda
-          .slice(0, 5)
-          .map((a) => `<li><strong>${escaparTexto(a.cliente)}</strong> — ${escaparTexto(a.servico)} (${escaparTexto(a.status)})</li>`)
-          .join("")}</ul>`
-      : `<p class="muted-text">Nenhum atendimento registrado ainda.</p>`;
-  }
-
-  document.getElementById("lista-clientes").innerHTML = clientes.length
-    ? `<table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Observações</th><th>Ação</th></tr></thead><tbody>${clientes
-        .map(
-          (c) => `<tr>
-            <td>${escaparTexto(c.nome)}</td>
-            <td>${escaparTexto(c.telefone)}</td>
-            <td>${escaparTexto(c.email || "-")}</td>
-            <td>${escaparTexto(c.observacoes || "-")}</td>
-            <td><button type="button" class="btn btn-outline btn-sm" data-del-col="clientes" data-id="${c.id}">Excluir</button></td>
-          </tr>`
-        )
-        .join("")}</tbody></table>`
-    : `<p class="muted-text">Nenhum cliente cadastrado.</p>`;
-
-  document.getElementById("lista-servicos").innerHTML = servicos.length
-    ? `<table><thead><tr><th>Serviço</th><th>Valor</th><th>Duração</th><th>Descrição</th><th>Ação</th></tr></thead><tbody>${servicos
-        .map(
-          (s) => `<tr>
-            <td>${escaparTexto(s.nome)}</td>
-            <td>${formatarMoeda(s.preco)}</td>
-            <td>${escaparTexto(s.duracao || 60)} min</td>
-            <td>${escaparTexto(s.descricao || "-")}</td>
-            <td><button type="button" class="btn btn-outline btn-sm" data-del-col="servicos" data-id="${s.id}">Excluir</button></td>
-          </tr>`
-        )
-        .join("")}</tbody></table>`
-    : `<p class="muted-text">Nenhum serviço cadastrado.</p>`;
-
-  document.getElementById("lista-agenda").innerHTML = agenda.length
-    ? `<table><thead><tr><th>Cliente</th><th>Serviço</th><th>Data/Hora</th><th>Profissional</th><th>Status</th><th>Ação</th></tr></thead><tbody>${agenda
-        .map(
-          (a) => `<tr>
-            <td>${escaparTexto(a.cliente)}</td>
-            <td>${escaparTexto(a.servico)}</td>
-            <td>${escaparTexto(a.data || "-")}</td>
-            <td>${escaparTexto(a.profissional || "-")}</td>
-            <td>${escaparTexto(a.status || "Agendado")}</td>
-            <td><button type="button" class="btn btn-outline btn-sm" data-del-col="agenda" data-id="${a.id}">Excluir</button></td>
-          </tr>`
-        )
-        .join("")}</tbody></table>`
-    : `<p class="muted-text">Nenhum agendamento cadastrado.</p>`;
-
-  document.getElementById("lista-portfolio").innerHTML = portfolio.length
-    ? portfolio
-        .map(
-          (p) => `<div class="mini-card">
-            <strong>${escaparTexto(p.titulo)}</strong>
-            <div class="muted-text">${escaparTexto(p.categoria)}</div>
-            <p style="margin:8px 0 0;font-size:13px;">${escaparTexto(p.descricao || "")}</p>
-          </div>`
-        )
-        .join("")
-    : `<p class="muted-text">Nenhum item publicado no portfólio.</p>`;
-
-  document.getElementById("lista-financeiro").innerHTML = financeiro.length
-    ? `<table><thead><tr><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Data</th><th>Ação</th></tr></thead><tbody>${financeiro
-        .map(
-          (f) => `<tr>
-            <td>${f.tipo === "entrada" ? "Entrada" : "Saída"}</td>
-            <td>${escaparTexto(f.descricao)}</td>
-            <td>${formatarMoeda(f.valor)}</td>
-            <td>${escaparTexto(f.data || "-")}</td>
-            <td><button type="button" class="btn btn-outline btn-sm" data-del-col="financeiro" data-id="${f.id}">Excluir</button></td>
-          </tr>`
-        )
-        .join("")}</tbody></table>`
-    : `<p class="muted-text">Nenhum lançamento financeiro.</p>`;
-
-  const fluxoBox = document.getElementById("resumo-fluxo-caixa");
-  if (fluxoBox) {
-    fluxoBox.innerHTML = `
-      <div class="kpi-card"><span>Receitas</span><strong>${formatarMoeda(entradas)}</strong></div>
-      <div class="kpi-card"><span>Despesas</span><strong>${formatarMoeda(saidas)}</strong></div>
-      <div class="kpi-card"><span>Saldo Líquido</span><strong>${formatarMoeda(saldo)}</strong></div>
-    `;
-  }
-
-  document.getElementById("relatorio-financeiro-box").innerHTML =
-    `<p>Total de entradas: <strong>${formatarMoeda(entradas)}</strong> | Total de saídas: <strong>${formatarMoeda(saidas)}</strong> | Saldo: <strong>${formatarMoeda(saldo)}</strong></p>`;
-  document.getElementById("relatorio-desempenho-box").innerHTML =
-    `<p>Clientes ativos: <strong>${clientes.length}</strong> | Serviços cadastrados: <strong>${servicos.length}</strong> | Atendimentos na agenda: <strong>${agenda.length}</strong></p>`;
-  document.getElementById("relatorio-comparativo-box").innerHTML =
-    `<p>Ticket médio por lançamento de entrada: <strong>${formatarMoeda(
-      financeiro.filter((f) => f.tipo === "entrada").length
-        ? entradas / financeiro.filter((f) => f.tipo === "entrada").length
-        : 0
-    )}</strong></p>`;
+  renderClientes(empresaId, clientes);
+  renderServicos(empresaId, servicos);
+  renderFinanceiro(empresaId, financeiro);
 }
 
-document.getElementById("form-cliente").addEventListener("submit", async (e) => {
+formClienteEl?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (!empresaAtualId) return;
-  await addDoc(subColRef(empresaAtualId, "clientes"), {
-    nome: document.getElementById("cliente-nome").value.trim(),
-    telefone: document.getElementById("cliente-telefone").value.trim(),
-    email: document.getElementById("cliente-email").value.trim(),
-    observacoes: document.getElementById("cliente-observacoes").value.trim(),
-    criadoEm: new Date().toISOString()
-  });
-  e.target.reset();
-  await carregarTodosDados();
-});
-
-document.getElementById("form-servico").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!empresaAtualId) return;
-  await addDoc(subColRef(empresaAtualId, "servicos"), {
-    nome: document.getElementById("servico-nome").value.trim(),
-    preco: Number(document.getElementById("servico-preco").value || 0),
-    duracao: Number(document.getElementById("servico-duracao").value || 60),
-    descricao: document.getElementById("servico-descricao").value.trim(),
-    criadoEm: new Date().toISOString()
-  });
-  e.target.reset();
-  await carregarTodosDados();
-});
-
-document.getElementById("form-agenda").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!empresaAtualId) return;
-  await addDoc(subColRef(empresaAtualId, "agenda"), {
-    cliente: document.getElementById("agenda-cliente").value.trim(),
-    servico: document.getElementById("agenda-servico").value.trim(),
-    data: document.getElementById("agenda-data").value,
-    profissional: document.getElementById("agenda-profissional").value.trim(),
-    status: document.getElementById("agenda-status").value,
-    criadoEm: new Date().toISOString()
-  });
-  e.target.reset();
-  await carregarTodosDados();
-});
-
-document.getElementById("form-portfolio").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!empresaAtualId) return;
-  await addDoc(subColRef(empresaAtualId, "portfolio"), {
-    titulo: document.getElementById("portfolio-titulo").value.trim(),
-    categoria: document.getElementById("portfolio-categoria").value.trim(),
-    imagem: document.getElementById("portfolio-imagem").value.trim(),
-    descricao: document.getElementById("portfolio-descricao").value.trim(),
-    criadoEm: new Date().toISOString()
-  });
-  e.target.reset();
-  await carregarTodosDados();
-});
-
-document.getElementById("btn-salvar-pagina").addEventListener("click", async () => {
-  if (!empresaAtualId) return;
-  const slogan = document.getElementById("pagina-slogan").value.trim();
-  const destaque = document.getElementById("pagina-destaque").value.trim();
-  await updateDoc(empresaDocRef(empresaAtualId), { slogan, destaque });
-  dadosEmpresa = { ...dadosEmpresa, slogan, destaque };
-  alert("Página comercial salva.");
-});
-
-document.getElementById("form-financeiro").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!empresaAtualId) return;
-  await addDoc(subColRef(empresaAtualId, "financeiro"), {
-    tipo: document.getElementById("fin-tipo").value,
-    descricao: document.getElementById("fin-descricao").value.trim(),
-    valor: Number(document.getElementById("fin-valor").value || 0),
-    data: document.getElementById("fin-data").value,
-    criadoEm: new Date().toISOString()
-  });
-  e.target.reset();
-  await carregarTodosDados();
-});
-
-document.getElementById("form-config-empresa").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!empresaAtualId) return;
-  const nomeEmpresa = document.getElementById("cfg-nome-empresa").value.trim();
-  const corPrimaria = document.getElementById("cfg-cor-primaria").value;
-  const telefone = document.getElementById("cfg-telefone").value.trim();
-  const cidade = document.getElementById("cfg-cidade").value.trim();
-
-  await updateDoc(empresaDocRef(empresaAtualId), {
-    nomeEmpresa,
-    corPrimaria,
+  if (!currentUser) return;
+  const nome = document.getElementById("mt-cli-nome")?.value.trim() || "";
+  const telefone = document.getElementById("mt-cli-telefone")?.value.trim() || "";
+  const obs = document.getElementById("mt-cli-obs")?.value.trim() || "";
+  if (!nome) return;
+  await addDoc(collection(db, ROOT_COLLECTION, currentUser.uid, "clientes"), {
+    nome,
     telefone,
-    cidade
+    obs,
+    criadoEm: new Date().toISOString()
   });
+  formClienteEl.reset();
+  await carregarTodosDados(currentUser.uid);
+});
 
-  dadosEmpresa = { ...dadosEmpresa, nomeEmpresa, corPrimaria, telefone, cidade };
-  aplicarPermissoesNaInterface();
-  document.getElementById("cfg-msg").textContent = "Configurações salvas com sucesso.";
+formServicoEl?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser) return;
+  const titulo = document.getElementById("mt-srv-titulo")?.value.trim() || "";
+  const cliente = document.getElementById("mt-srv-cliente")?.value.trim() || "";
+  const valor = Number(document.getElementById("mt-srv-valor")?.value || 0);
+  const status = document.getElementById("mt-srv-status")?.value || "Em andamento";
+  if (!titulo) return;
+  await addDoc(collection(db, ROOT_COLLECTION, currentUser.uid, "servicos"), {
+    titulo,
+    cliente,
+    valor,
+    status,
+    criadoEm: new Date().toISOString()
+  });
+  formServicoEl.reset();
+  await carregarTodosDados(currentUser.uid);
+});
+
+formLancamentoEl?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser) return;
+  const descricao = document.getElementById("mt-fin-desc")?.value.trim() || "";
+  const tipo = document.getElementById("mt-fin-tipo")?.value || "entrada";
+  const valor = Number(document.getElementById("mt-fin-valor")?.value || 0);
+  if (!descricao || valor <= 0) return;
+  await addDoc(collection(db, ROOT_COLLECTION, currentUser.uid, "financeiro"), {
+    descricao,
+    tipo,
+    valor,
+    criadoEm: new Date().toISOString()
+  });
+  formLancamentoEl.reset();
+  await carregarTodosDados(currentUser.uid);
 });
 
 document.addEventListener("click", async (e) => {
-  const btn = e.target.closest("[data-del-col][data-id]");
-  if (!btn || !empresaAtualId) return;
+  const btn = e.target.closest("[data-del-col][data-del-id]");
+  if (!btn || !currentUser) return;
   const col = btn.dataset.delCol;
-  const id = btn.dataset.id;
-  await deleteDoc(doc(db, ROOT_COLLECTION, empresaAtualId, col, id));
-  await carregarTodosDados();
+  const id = btn.dataset.delId;
+  await deleteDoc(doc(db, ROOT_COLLECTION, currentUser.uid, col, id));
+  await carregarTodosDados(currentUser.uid);
 });
 
 onAuthStateChanged(auth, async (user) => {
+  currentUser = user;
   if (!user) {
-    empresaAtualId = null;
-    dadosEmpresa = null;
-    appShell.classList.add("hidden");
-    authScreen.classList.remove("hidden");
-    configurarAbasAuth("login");
+    appShellEl?.classList.add("hidden");
+    authScreenEl?.classList.remove("hidden");
     return;
   }
 
-  empresaAtualId = user.uid;
-  const snap = await getDoc(empresaDocRef(user.uid));
+  authScreenEl?.classList.add("hidden");
+  appShellEl?.classList.remove("hidden");
 
-  if (snap.exists()) {
-    dadosEmpresa = { planoId: "starter", ...snap.data() };
-  } else {
-    dadosEmpresa = {
-      sistema: "multitech",
-      nomeEmpresa: user.email?.split("@")[0] || "Empresa Multitech",
-      email: user.email || "",
-      planoId: "starter",
-      corPrimaria: "#0f172a",
-      telefone: "",
-      cidade: "",
-      slogan: "",
-      destaque: ""
-    };
-    await setDoc(empresaDocRef(user.uid), dadosEmpresa);
-  }
+  const empresaData = await garantirDocumentoEmpresa(user);
+  if (empresaNomeEl) empresaNomeEl.textContent = empresaData.nomeEmpresa || "Multitech";
+  if (empresaEmailEl) empresaEmailEl.textContent = user.email || "";
 
-  document.getElementById("cfg-nome-empresa").value = dadosEmpresa.nomeEmpresa || "";
-  document.getElementById("cfg-cor-primaria").value = dadosEmpresa.corPrimaria || "#0f172a";
-  document.getElementById("cfg-telefone").value = dadosEmpresa.telefone || "";
-  document.getElementById("cfg-cidade").value = dadosEmpresa.cidade || "";
-  document.getElementById("pagina-slogan").value = dadosEmpresa.slogan || "";
-  document.getElementById("pagina-destaque").value = dadosEmpresa.destaque || "";
-
-  authScreen.classList.add("hidden");
-  appShell.classList.remove("hidden");
-  ativarView("dashboard");
-  aplicarPermissoesNaInterface();
-
-  gerenciadorOp = new GerenciadorOperadores({
+  gerenciadorOperadores = new GerenciadorOperadores({
     db,
     empresaId: user.uid,
-    planoId: dadosEmpresa.planoId,
-    limiteOperadores: limiteOperadoresDoPlano(dadosEmpresa.planoId)
+    planoId: empresaData.planoId || "enterprise"
   });
-  await gerenciadorOp.iniciar();
-  await carregarTodosDados();
+  await gerenciadorOperadores.iniciar();
+  await carregarTodosDados(user.uid);
 });
