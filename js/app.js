@@ -17,8 +17,30 @@ import {
 
 import { auth, db } from "./firebase-config.js";
 import { GerenciadorOperadores } from "./operadores.js";
+import { limiteOperadoresDoPlano } from "./planos-permissoes.js";
 
 const ROOT_COLLECTION = "multitech_empresas";
+
+const PLANOS_CATALOGO = [
+  {
+    id: "starter",
+    nome: "Starter",
+    preco: "R$ 79/mês",
+    descricao: "Ideal para operação enxuta e início de equipe."
+  },
+  {
+    id: "pro",
+    nome: "Profissional",
+    preco: "R$ 159/mês",
+    descricao: "Gestão completa com múltiplas frentes e operadores."
+  },
+  {
+    id: "enterprise",
+    nome: "Enterprise",
+    preco: "R$ 299/mês",
+    descricao: "Acesso amplo, montagem de equipes e visão gerencial."
+  }
+];
 
 const authScreenEl = document.getElementById("mt-auth-screen");
 const appShellEl = document.getElementById("mt-app-shell");
@@ -30,6 +52,7 @@ const authErroEl = document.getElementById("mt-auth-erro");
 
 const empresaNomeEl = document.getElementById("mt-empresa-nome");
 const empresaEmailEl = document.getElementById("mt-empresa-email");
+const planoBadgeEl = document.getElementById("mt-plano-atual-badge");
 const btnSairEl = document.getElementById("mt-btn-sair");
 const btnMenuEl = document.getElementById("mt-btn-menu");
 const sidebarEl = document.getElementById("mt-sidebar");
@@ -41,6 +64,9 @@ const kpiServicosEl = document.getElementById("kpi-servicos");
 const kpiReceitasEl = document.getElementById("kpi-receitas");
 const kpiSaldoEl = document.getElementById("kpi-saldo");
 
+const dashGraficoEl = document.getElementById("mt-dash-grafico");
+const finGraficoEl = document.getElementById("mt-fin-grafico");
+
 const formClienteEl = document.getElementById("mt-form-cliente");
 const listaClientesEl = document.getElementById("mt-lista-clientes");
 
@@ -50,7 +76,12 @@ const listaServicosEl = document.getElementById("mt-lista-servicos");
 const formLancamentoEl = document.getElementById("mt-form-lancamento");
 const listaFinanceiroEl = document.getElementById("mt-lista-financeiro");
 
+const formMontarEquipeEl = document.getElementById("mt-form-montar-equipe");
+const listaEquipesEl = document.getElementById("mt-lista-equipes");
+const gridPlanosEl = document.getElementById("mt-grid-planos");
+
 let currentUser = null;
+let planoAtualId = "enterprise";
 let gerenciadorOperadores = null;
 let deferredInstallPrompt = null;
 
@@ -154,6 +185,87 @@ btnAtualizarEl?.addEventListener("click", async () => {
   }
 });
 
+function renderGraficoFinanceiro(receitas, saidas) {
+  const saldo = receitas - saidas;
+  const maxVal = Math.max(receitas, saidas, Math.abs(saldo), 1);
+  const pctEntrada = Math.min(100, Math.round((receitas / maxVal) * 100));
+  const pctSaida = Math.min(100, Math.round((saidas / maxVal) * 100));
+  const pctSaldo = Math.min(100, Math.round((Math.max(0, saldo) / maxVal) * 100));
+
+  const html = `
+    <div class="chart-bars">
+      <div class="chart-row">
+        <span>Entradas</span>
+        <div class="chart-track"><div class="chart-fill entrada" style="width:${pctEntrada}%"></div></div>
+        <strong>${formatarMoeda(receitas)}</strong>
+      </div>
+      <div class="chart-row">
+        <span>Saídas</span>
+        <div class="chart-track"><div class="chart-fill saida" style="width:${pctSaida}%"></div></div>
+        <strong>${formatarMoeda(saidas)}</strong>
+      </div>
+      <div class="chart-row">
+        <span>Saldo</span>
+        <div class="chart-track"><div class="chart-fill saldo" style="width:${pctSaldo}%"></div></div>
+        <strong>${formatarMoeda(saldo)}</strong>
+      </div>
+    </div>
+  `;
+
+  if (dashGraficoEl) dashGraficoEl.innerHTML = html;
+  if (finGraficoEl) finGraficoEl.innerHTML = html;
+}
+
+function renderPlanos() {
+  if (!gridPlanosEl) return;
+  const planoAtivo = PLANOS_CATALOGO.find((p) => p.id === planoAtualId) || PLANOS_CATALOGO[2];
+  if (planoBadgeEl) {
+    planoBadgeEl.textContent = `Plano: ${planoAtivo.nome}`;
+  }
+
+  gridPlanosEl.innerHTML = PLANOS_CATALOGO.map((plano) => {
+    const limiteOp = limiteOperadoresDoPlano(plano.id);
+    const isAtual = plano.id === planoAtualId;
+    return `
+      <article class="plan-card ${isAtual ? "active-plan" : ""}">
+        <div>
+          <h3>${esc(plano.nome)}</h3>
+          <div class="plan-price">${esc(plano.preco)}</div>
+          <p class="muted-text">${esc(plano.descricao)}</p>
+          <ul class="plan-features">
+            <li>Até ${esc(limiteOp)} operadores internos</li>
+            <li>Clientes, serviços e gráfico financeiro</li>
+            <li>Montagem de equipes e atalho PWA</li>
+          </ul>
+        </div>
+        <button
+          type="button"
+          class="btn ${isAtual ? "btn-outline" : "btn-primary"} btn-full"
+          data-selecionar-plano="${esc(plano.id)}"
+        >
+          ${isAtual ? "Plano Ativo" : "Ativar Este Plano"}
+        </button>
+      </article>
+    `;
+  }).join("");
+}
+
+gridPlanosEl?.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-selecionar-plano]");
+  if (!btn || !currentUser) return;
+  const novoPlanoId = btn.dataset.selecionarPlano;
+  planoAtualId = novoPlanoId;
+  await setDoc(
+    doc(db, ROOT_COLLECTION, currentUser.uid),
+    { planoId: novoPlanoId, atualizadoEm: new Date().toISOString() },
+    { merge: true }
+  );
+  if (gerenciadorOperadores) {
+    await gerenciadorOperadores.atualizarPlano(novoPlanoId);
+  }
+  renderPlanos();
+});
+
 async function garantirDocumentoEmpresa(user) {
   const ref = doc(db, ROOT_COLLECTION, user.uid);
   const snap = await getDoc(ref);
@@ -180,7 +292,7 @@ async function listarSubcolecao(empresaId, sub) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-function renderClientes(empresaId, itens) {
+function renderClientes(itens) {
   if (!listaClientesEl) return;
   if (!itens.length) {
     listaClientesEl.innerHTML = `<p class="muted-text">Nenhum cliente cadastrado ainda.</p>`;
@@ -198,7 +310,7 @@ function renderClientes(empresaId, itens) {
     .join("")}</tbody></table>`;
 }
 
-function renderServicos(empresaId, itens) {
+function renderServicos(itens) {
   if (!listaServicosEl) return;
   if (!itens.length) {
     listaServicosEl.innerHTML = `<p class="muted-text">Nenhum serviço ou pedido registrado.</p>`;
@@ -217,7 +329,7 @@ function renderServicos(empresaId, itens) {
     .join("")}</tbody></table>`;
 }
 
-function renderFinanceiro(empresaId, itens) {
+function renderFinanceiro(itens) {
   if (!listaFinanceiroEl) return;
   if (!itens.length) {
     listaFinanceiroEl.innerHTML = `<p class="muted-text">Nenhum lançamento financeiro registrado.</p>`;
@@ -235,11 +347,31 @@ function renderFinanceiro(empresaId, itens) {
     .join("")}</tbody></table>`;
 }
 
+function renderEquipes(itens) {
+  if (!listaEquipesEl) return;
+  if (!itens.length) {
+    listaEquipesEl.innerHTML = `<p class="muted-text">Nenhuma equipe montada ainda.</p>`;
+    return;
+  }
+  listaEquipesEl.innerHTML = `<table><thead><tr><th>Equipe</th><th>Líder</th><th>Integrantes</th><th>Turno / Alocação</th><th>Ação</th></tr></thead><tbody>${itens
+    .map(
+      (item) => `<tr>
+        <td>${esc(item.nome)}</td>
+        <td>${esc(item.lider)}</td>
+        <td>${esc(item.membros)}</td>
+        <td>${esc(item.turno)}</td>
+        <td><button type="button" class="btn btn-outline btn-sm" data-del-col="equipes" data-del-id="${esc(item.id)}">Excluir</button></td>
+      </tr>`
+    )
+    .join("")}</tbody></table>`;
+}
+
 async function carregarTodosDados(empresaId) {
-  const [clientes, servicos, financeiro] = await Promise.all([
+  const [clientes, servicos, financeiro, equipes] = await Promise.all([
     listarSubcolecao(empresaId, "clientes"),
     listarSubcolecao(empresaId, "servicos"),
-    listarSubcolecao(empresaId, "financeiro")
+    listarSubcolecao(empresaId, "financeiro"),
+    listarSubcolecao(empresaId, "equipes")
   ]);
 
   const receitas = financeiro
@@ -255,9 +387,11 @@ async function carregarTodosDados(empresaId) {
   if (kpiReceitasEl) kpiReceitasEl.textContent = formatarMoeda(receitas);
   if (kpiSaldoEl) kpiSaldoEl.textContent = formatarMoeda(receitas - saidas);
 
-  renderClientes(empresaId, clientes);
-  renderServicos(empresaId, servicos);
-  renderFinanceiro(empresaId, financeiro);
+  renderGraficoFinanceiro(receitas, saidas);
+  renderClientes(clientes);
+  renderServicos(servicos);
+  renderFinanceiro(financeiro);
+  renderEquipes(equipes);
 }
 
 formClienteEl?.addEventListener("submit", async (e) => {
@@ -313,6 +447,25 @@ formLancamentoEl?.addEventListener("submit", async (e) => {
   await carregarTodosDados(currentUser.uid);
 });
 
+formMontarEquipeEl?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentUser) return;
+  const nome = document.getElementById("mt-eq-nome")?.value.trim() || "";
+  const lider = document.getElementById("mt-eq-lider")?.value.trim() || "";
+  const membros = document.getElementById("mt-eq-membros")?.value.trim() || "";
+  const turno = document.getElementById("mt-eq-turno")?.value.trim() || "";
+  if (!nome || !lider) return;
+  await addDoc(collection(db, ROOT_COLLECTION, currentUser.uid, "equipes"), {
+    nome,
+    lider,
+    membros,
+    turno,
+    criadoEm: new Date().toISOString()
+  });
+  formMontarEquipeEl.reset();
+  await carregarTodosDados(currentUser.uid);
+});
+
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-del-col][data-del-id]");
   if (!btn || !currentUser) return;
@@ -334,13 +487,16 @@ onAuthStateChanged(auth, async (user) => {
   appShellEl?.classList.remove("hidden");
 
   const empresaData = await garantirDocumentoEmpresa(user);
+  planoAtualId = empresaData.planoId || "enterprise";
   if (empresaNomeEl) empresaNomeEl.textContent = empresaData.nomeEmpresa || "Multitech";
   if (empresaEmailEl) empresaEmailEl.textContent = user.email || "";
+
+  renderPlanos();
 
   gerenciadorOperadores = new GerenciadorOperadores({
     db,
     empresaId: user.uid,
-    planoId: empresaData.planoId || "enterprise"
+    planoId: planoAtualId
   });
   await gerenciadorOperadores.iniciar();
   await carregarTodosDados(user.uid);
