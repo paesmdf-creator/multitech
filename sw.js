@@ -1,4 +1,4 @@
-const CACHE_NAME = "multitech-pwa-v6";
+const CACHE_NAME = "multitech-pwa-v7";
 const ASSETS = [
   "./",
   "./index.html",
