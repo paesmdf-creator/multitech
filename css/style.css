@@ -5,15 +5,18 @@
 }
 
 :root {
-  --bg: #f1f5f9;
-  --surface: #ffffff;
-  --surface-alt: #f8fafc;
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --primary: #0f172a;
-  --primary-hover: #1e293b;
-  --accent: #0284c7;
+  --bg: #e9f2fa;
+  --surface: #fbf5e6;
+  --surface-alt: #f4ead2;
+  --surface-sidebar: #dceaf7;
+  --text: #18324a;
+  --muted: #4f6b85;
+  --border: #9bbbd6;
+  --primary: #e6c269;
+  --primary-hover: #d8b04d;
+  --primary-text: #2b2106;
+  --accent: #d4a638;
+  --accent-text: #2b2106;
   --success: #16a34a;
   --danger: #dc2626;
   --radius: 12px;
@@ -48,6 +51,7 @@ body {
   display: grid;
   place-items: center;
   padding: 20px;
+  background: radial-gradient(circle at top, #f3f8fd 0%, var(--bg) 100%);
 }
 
 .auth-card {
@@ -57,7 +61,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 28px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 28px rgba(24, 50, 74, 0.08);
 }
 
 .brand-header {
@@ -92,7 +96,8 @@ body {
   height: 46px;
   border-radius: 12px;
   background: var(--primary);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--primary-text);
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -110,7 +115,8 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  background: var(--surface-alt);
+  background: var(--surface-sidebar);
+  border: 1px solid var(--border);
   padding: 4px;
   border-radius: 10px;
   margin-bottom: 18px;
@@ -127,9 +133,9 @@ body {
 }
 
 .tab-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  background: var(--primary);
+  color: var(--primary-text);
+  box-shadow: 0 1px 3px rgba(24, 50, 74, 0.1);
 }
 
 .stack-form {
@@ -178,7 +184,8 @@ body {
 
 .btn-primary {
   background: var(--primary);
-  color: #ffffff;
+  border-color: var(--border);
+  color: var(--primary-text);
 }
 
 .btn-primary:hover {
@@ -187,13 +194,18 @@ body {
 
 .btn-accent {
   background: var(--accent);
-  color: #ffffff;
+  border-color: var(--border);
+  color: var(--accent-text);
 }
 
 .btn-outline {
   background: var(--surface);
   color: var(--text);
   border-color: var(--border);
+}
+
+.btn-outline:hover {
+  background: var(--surface-alt);
 }
 
 .btn-sm {
@@ -236,6 +248,7 @@ body {
 .badge {
   background: var(--surface-alt);
   border: 1px solid var(--border);
+  color: var(--text);
   padding: 5px 10px;
   border-radius: 999px;
   font-size: 0.82rem;
@@ -243,9 +256,9 @@ body {
 }
 
 .badge-accent {
-  background: #e0f2fe;
-  border-color: #bae6fd;
-  color: #0369a1;
+  background: var(--primary);
+  border-color: var(--border);
+  color: var(--primary-text);
 }
 
 .app-body {
@@ -255,7 +268,7 @@ body {
 }
 
 .sidebar {
-  background: var(--surface);
+  background: var(--surface-sidebar);
   border-right: 1px solid var(--border);
   padding: 16px 12px;
 }
@@ -270,7 +283,7 @@ body {
   width: 100%;
   text-align: left;
   background: transparent;
-  border: 0;
+  border: 1px solid transparent;
   padding: 10px 12px;
   border-radius: 9px;
   font-weight: 600;
@@ -278,10 +291,16 @@ body {
   cursor: pointer;
 }
 
-.nav-item.active,
 .nav-item:hover {
-  background: var(--surface-alt);
+  background: var(--surface);
+  border-color: var(--border);
   color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--primary);
+  border-color: var(--border);
+  color: var(--primary-text);
 }
 
 .main-content {
@@ -367,7 +386,7 @@ body {
 
 .chart-track {
   height: 16px;
-  background: var(--surface-alt);
+  background: var(--surface-sidebar);
   border: 1px solid var(--border);
   border-radius: 999px;
   overflow: hidden;
@@ -410,7 +429,7 @@ body {
 
 .plan-card.active-plan {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+  box-shadow: 0 0 0 2px rgba(212, 166, 56, 0.25);
 }
 
 .plan-card h3 {
@@ -460,15 +479,15 @@ td {
 }
 
 th {
-  color: var(--muted);
+  color: var(--text);
   font-weight: 600;
-  background: var(--surface-alt);
+  background: var(--surface-sidebar);
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(24, 50, 74, 0.45);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -479,6 +498,7 @@ th {
   width: 100%;
   max-width: 420px;
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px;
 }
@@ -498,6 +518,7 @@ th {
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--surface-alt);
+  color: var(--text);
   cursor: pointer;
 }
 
