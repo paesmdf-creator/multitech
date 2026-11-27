@@ -1,438 +1,295 @@
-// js/operadores.js
-// Gerencia os operadores internos dentro do mesmo login da empresa (empresas/{uid}/operadores)
-
 import {
-  collection,
   doc,
-  getDoc,
+  collection,
   getDocs,
   addDoc,
-  updateDoc,
-  serverTimestamp
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import {
   PERFIS_INTERNOS,
-  obterPlano,
-  aplicarPermissoesNaInterface
+  obterPerfisPermitidosNoPlano,
+  limiteOperadoresDoPlano
 } from "./planos-permissoes.js";
 
-const STORAGE_KEY_PREFIX = "multitech_operador_ativo_";
+const ROOT_COLLECTION = "multitech_empresas";
+const SESSAO_OP_KEY = "mt_operador_sessao_v1";
 
-async function gerarHashPin(pin) {
-  const limpo = String(pin || "").trim();
-  if (!limpo) return "";
-  const encoder = new TextEncoder();
-  const data = encoder.encode(limpo);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function escapar(texto) {
+  return String(texto ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 export class GerenciadorOperadores {
-  constructor(db, uidEmpresa, planoInicial = "starter") {
+  constructor({ db, empresaId, planoId, limiteOperadores }) {
     this.db = db;
-    this.uid = uidEmpresa;
-    this.plano = obterPlano(planoInicial);
+    this.empresaId = empresaId;
+    this.planoId = planoId || "starter";
+    this.limiteOperadores = limiteOperadores ?? limiteOperadoresDoPlano(this.planoId);
+
     this.operadores = [];
-    this.operadorAtivo = null;
-    this._pendentePinId = null;
-    this._eventosConfigurados = false;
+    this.operadorAtual = null;
+    this.operadorPendentePin = null;
+
+    this.badgeEl = document.getElementById("mt-operador-atual-badge");
+    this.btnTrocarEl = document.getElementById("mt-btn-trocar-operador");
+    this.modalEl = document.getElementById("mt-modal-operadores");
+    this.listaLoginEl = document.getElementById("mt-lista-operadores-login");
+    this.areaPinEl = document.getElementById("mt-area-pin");
+    this.inputPinEl = document.getElementById("mt-input-pin");
+    this.btnConfirmarPinEl = document.getElementById("mt-btn-confirmar-pin");
+    this.erroPinEl = document.getElementById("mt-erro-pin");
+
+    this.formNovoOpEl = document.getElementById("mt-form-novo-operador");
+    this.selectPerfilEl = document.getElementById("mt-op-perfil");
+    this.resumoLimiteEl = document.getElementById("mt-resumo-limite-equipe");
+    this.msgEquipeEl = document.getElementById("mt-msg-equipe");
+    this.tabelaOperadoresEl = document.getElementById("mt-tabela-operadores");
+
+    this._bindEventos();
+  }
+
+  _colRef() {
+    return collection(this.db, ROOT_COLLECTION, this.empresaId, "operadores");
+  }
+
+  _bindEventos() {
+    if (this.btnTrocarEl) {
+      this.btnTrocarEl.onclick = () => this.abrirModalSelecao();
+    }
+
+    if (this.btnConfirmarPinEl) {
+      this.btnConfirmarPinEl.onclick = () => this._confirmarPin();
+    }
+
+    if (this.inputPinEl) {
+      this.inputPinEl.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this._confirmarPin();
+        }
+      };
+    }
+
+    if (this.formNovoOpEl) {
+      this.formNovoOpEl.onsubmit = (e) => this._cadastrarOperador(e);
+    }
+
+    if (this.tabelaOperadoresEl) {
+      this.tabelaOperadoresEl.onclick = async (e) => {
+        const btn = e.target.closest("[data-del-op]");
+        if (!btn) return;
+        const id = btn.dataset.delOp;
+        await deleteDoc(doc(this.db, ROOT_COLLECTION, this.empresaId, "operadores", id));
+        await this.carregarOperadores();
+        this.renderizarGestao();
+      };
+    }
   }
 
   async iniciar() {
-    this._configurarEventosUI();
-
-    const empresaSnap = await getDoc(doc(this.db, "empresas", this.uid));
-    const planoSalvo = empresaSnap.exists() ? empresaSnap.data().plano : this.plano.id;
-    this.plano = obterPlano(planoSalvo);
-
     await this.carregarOperadores();
+    this.renderizarSelectPerfis();
+    this.renderizarGestao();
 
-    if (this.operadores.length === 0) {
-      const adminInicial = await this.criarOperadorInterno(
-        {
-          nome: "Administrador",
-          loginInterno: "admin",
-          perfil: "admin",
-          pin: ""
-        },
-        true
-      );
-      this.definirOperadorAtivo(adminInicial);
-      this.renderizarTabelaOperadores();
-      return;
-    }
-
-    const ativos = this.operadores.filter((op) => op.ativo !== false);
-    const listaParaEscolha = ativos.length > 0 ? ativos : this.operadores;
-
-    if (
-      this.plano.maxUsuariosInternos === 1 ||
-      (listaParaEscolha.length === 1 && !listaParaEscolha[0].pinHash)
-    ) {
-      this.definirOperadorAtivo(listaParaEscolha[0]);
-      this.renderizarTabelaOperadores();
-      return;
-    }
-
-    const salvoId = sessionStorage.getItem(STORAGE_KEY_PREFIX + this.uid);
-    if (salvoId) {
-      const encontrado = listaParaEscolha.find((op) => op.id === salvoId);
+    const salva = this._lerSessaoSalva();
+    if (salva) {
+      const encontrado = this.operadores.find((op) => op.id === salva.id);
       if (encontrado) {
-        this.definirOperadorAtivo(encontrado);
-        this.renderizarTabelaOperadores();
+        this._definirOperadorAtivo(encontrado);
         return;
       }
     }
 
-    this.abrirModalSelecaoOperador();
-    this.renderizarTabelaOperadores();
+    if (this.operadores.length > 0) {
+      this.abrirModalSelecao();
+    } else {
+      this._definirOperadorAtivo({
+        id: "admin-padrao",
+        nome: "Administrador",
+        login: "admin",
+        perfil: "admin",
+        pin: ""
+      });
+    }
+  }
+
+  async atualizarPlano(novoPlanoId) {
+    this.planoId = novoPlanoId || "starter";
+    this.limiteOperadores = limiteOperadoresDoPlano(this.planoId);
+    this.renderizarSelectPerfis();
+    this.renderizarGestao();
   }
 
   async carregarOperadores() {
-    const colRef = collection(this.db, "empresas", this.uid, "operadores");
-    const snap = await getDocs(colRef);
+    const snap = await getDocs(this._colRef());
     this.operadores = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    return this.operadores;
   }
 
-  definirOperadorAtivo(operador) {
-    this.operadorAtivo = operador;
-    sessionStorage.setItem(STORAGE_KEY_PREFIX + this.uid, operador.id);
-
-    const badge = document.getElementById("mt-operador-atual-badge");
-    if (badge) {
-      const perfilLabel = PERFIS_INTERNOS[operador.perfil]?.label || operador.perfil;
-      badge.textContent = `${operador.nome} • ${perfilLabel}`;
-    }
-
-    aplicarPermissoesNaInterface(this.plano.id, operador);
-    this.fecharModalSelecaoOperador();
-    this.renderizarTabelaOperadores();
-
-    document.dispatchEvent(
-      new CustomEvent("multitech:operador-alterado", {
-        detail: { operador, plano: this.plano }
+  renderizarSelectPerfis() {
+    if (!this.selectPerfilEl) return;
+    const permitidos = obterPerfisPermitidosNoPlano(this.planoId);
+    this.selectPerfilEl.innerHTML = permitidos
+      .map((chave) => {
+        const nome = PERFIS_INTERNOS[chave]?.nome || chave;
+        return `<option value="${escapar(chave)}">${escapar(nome)}</option>`;
       })
-    );
+      .join("");
   }
 
-  async autenticarOperador(operadorId, pinDigitado = "") {
-    const operador = this.operadores.find((op) => op.id === operadorId);
-    if (!operador) throw new Error("Usuário interno não encontrado.");
-    if (operador.ativo === false) throw new Error("Usuário interno desativado.");
-
-    if (operador.pinHash) {
-      const hashDigitado = await gerarHashPin(pinDigitado);
-      if (hashDigitado !== operador.pinHash) {
-        throw new Error("PIN interno incorreto.");
-      }
+  renderizarGestao() {
+    if (this.resumoLimiteEl) {
+      this.resumoLimiteEl.textContent = `Usuários internos cadastrados: ${this.operadores.length} de ${this.limiteOperadores} permitidos no plano.`;
     }
 
-    this.definirOperadorAtivo(operador);
-    return operador;
-  }
-
-  async criarOperadorInterno(
-    { nome, loginInterno, perfil, pin = "", modulosExtras = [] },
-    ignorarChecagemAdmin = false
-  ) {
-    if (!ignorarChecagemAdmin && this.operadorAtivo?.perfil !== "admin") {
-      throw new Error("Apenas o Administrador pode cadastrar usuários internos.");
+    if (!this.tabelaOperadoresEl) return;
+    if (!this.operadores.length) {
+      this.tabelaOperadoresEl.innerHTML = `<p class="muted-text">Nenhum usuário interno adicional cadastrado. O acesso principal funciona como Administrador.</p>`;
+      return;
     }
 
-    if (this.operadores.length >= this.plano.maxUsuariosInternos) {
-      throw new Error(
-        `Limite de ${this.plano.maxUsuariosInternos} usuário(s) atingido no plano ${this.plano.nome}.`
-      );
-    }
-
-    if (!this.plano.perfisPermitidos.includes(perfil)) {
-      throw new Error(`O perfil "${perfil}" não está disponível no plano ${this.plano.nome}.`);
-    }
-
-    const loginLimpo = String(loginInterno || "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ".");
-
-    if (!nome || !loginLimpo) {
-      throw new Error("Preencha o nome e o login interno.");
-    }
-
-    if (this.operadores.some((op) => op.loginInterno === loginLimpo)) {
-      throw new Error(`O login interno "${loginLimpo}" já existe.`);
-    }
-
-    const novoDoc = {
-      nome: nome.trim(),
-      loginInterno: loginLimpo,
-      perfil,
-      pinHash: await gerarHashPin(pin),
-      modulosExtras,
-      ativo: true,
-      criadoEm: serverTimestamp()
-    };
-
-    const ref = await addDoc(collection(this.db, "empresas", this.uid, "operadores"), novoDoc);
-    const criado = { id: ref.id, ...novoDoc };
-    this.operadores.push(criado);
-    this.renderizarTabelaOperadores();
-    return criado;
-  }
-
-  async atualizarOperador(operadorId, dados) {
-    if (this.operadorAtivo?.perfil !== "admin") {
-      throw new Error("Apenas o Administrador pode editar usuários internos.");
-    }
-
-    const payload = { atualizadoEm: serverTimestamp() };
-    if (dados.nome !== undefined) payload.nome = String(dados.nome).trim();
-    if (dados.perfil !== undefined) {
-      if (!this.plano.perfisPermitidos.includes(dados.perfil)) {
-        throw new Error(`Perfil não permitido no plano ${this.plano.nome}.`);
-      }
-      payload.perfil = dados.perfil;
-    }
-    if (dados.ativo !== undefined) payload.ativo = Boolean(dados.ativo);
-    if (dados.modulosExtras !== undefined) payload.modulosExtras = dados.modulosExtras;
-    if (dados.pin !== undefined && String(dados.pin).trim() !== "") {
-      payload.pinHash = await gerarHashPin(dados.pin);
-    }
-
-    await updateDoc(doc(this.db, "empresas", this.uid, "operadores", operadorId), payload);
-    await this.carregarOperadores();
-    this.renderizarTabelaOperadores();
-  }
-
-  obterAssinaturaAutoria() {
-    return {
-      operadorId: this.operadorAtivo?.id || "admin",
-      operadorNome: this.operadorAtivo?.nome || "Administrador",
-      operadorLogin: this.operadorAtivo?.loginInterno || "admin",
-      operadorPerfil: this.operadorAtivo?.perfil || "admin"
-    };
-  }
-
-  abrirModalSelecaoOperador() {
-    const modal = document.getElementById("mt-modal-operadores");
-    const lista = document.getElementById("mt-lista-operadores-login");
-    const areaPin = document.getElementById("mt-area-pin");
-    const erroPin = document.getElementById("mt-erro-pin");
-    const inputPin = document.getElementById("mt-input-pin");
-
-    if (!modal || !lista) return;
-
-    this._pendentePinId = null;
-    if (areaPin) areaPin.classList.add("hidden");
-    if (erroPin) erroPin.textContent = "";
-    if (inputPin) inputPin.value = "";
-
-    const ativos = this.operadores.filter((op) => op.ativo !== false);
-
-    lista.innerHTML = ativos
+    this.tabelaOperadoresEl.innerHTML = `<table><thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>PIN</th><th>Ação</th></tr></thead><tbody>${this.operadores
       .map((op) => {
-        const perfilLabel = PERFIS_INTERNOS[op.perfil]?.label || op.perfil;
-        const exigePin = Boolean(op.pinHash);
-        return `
-          <button type="button" class="op-card-btn" data-op-id="${op.id}" data-exige-pin="${exigePin}">
-            <strong>${op.nome}</strong>
-            <span>@${op.loginInterno} • ${perfilLabel}</span>
-            <small>${exigePin ? "🔒 Requer PIN" : "Entrar agora"}</small>
-          </button>
-        `;
+        const perfilNome = PERFIS_INTERNOS[op.perfil]?.nome || op.perfil;
+        return `<tr>
+          <td>${escapar(op.nome)}</td>
+          <td>${escapar(op.login)}</td>
+          <td>${escapar(perfilNome)}</td>
+          <td>${op.pin ? "Configurado" : "Sem PIN"}</td>
+          <td><button type="button" class="btn btn-outline btn-sm" data-del-op="${escapar(op.id)}">Remover</button></td>
+        </tr>`;
+      })
+      .join("")}</tbody></table>`;
+  }
+
+  async _cadastrarOperador(e) {
+    e.preventDefault();
+    if (this.msgEquipeEl) this.msgEquipeEl.textContent = "";
+
+    if (this.operadores.length >= this.limiteOperadores) {
+      if (this.msgEquipeEl) {
+        this.msgEquipeEl.textContent = `Limite de ${this.limiteOperadores} usuários internos atingido para o plano atual.`;
+      }
+      return;
+    }
+
+    const nome = document.getElementById("mt-op-nome")?.value.trim() || "";
+    const login = document.getElementById("mt-op-login")?.value.trim() || "";
+    const perfil = this.selectPerfilEl?.value || "operador";
+    const pin = document.getElementById("mt-op-pin")?.value.trim() || "";
+
+    if (!nome || !login) return;
+
+    await addDoc(this._colRef(), {
+      nome,
+      login,
+      perfil,
+      pin,
+      criadoEm: new Date().toISOString()
+    });
+
+    this.formNovoOpEl.reset();
+    await this.carregarOperadores();
+    this.renderizarGestao();
+    if (this.msgEquipeEl) {
+      this.msgEquipeEl.textContent = "Usuário interno adicionado com sucesso.";
+    }
+  }
+
+  abrirModalSelecao() {
+    if (!this.modalEl || !this.listaLoginEl) return;
+    this.operadorPendentePin = null;
+    if (this.areaPinEl) this.areaPinEl.classList.add("hidden");
+    if (this.erroPinEl) this.erroPinEl.textContent = "";
+    if (this.inputPinEl) this.inputPinEl.value = "";
+
+    const opcoes = [
+      { id: "admin-padrao", nome: "Administrador (Conta Principal)", login: "admin", perfil: "admin", pin: "" },
+      ...this.operadores
+    ];
+
+    this.listaLoginEl.innerHTML = opcoes
+      .map((op) => {
+        const perfilNome = PERFIS_INTERNOS[op.perfil]?.nome || op.perfil;
+        return `<button type="button" class="op-card-btn" data-sel-op="${escapar(op.id)}">
+          <strong>${escapar(op.nome)}</strong>
+          <span class="muted-text">@${escapar(op.login)} · ${escapar(perfilNome)}${op.pin ? " · PIN obrigatório" : ""}</span>
+        </button>`;
       })
       .join("");
 
-    modal.classList.remove("hidden");
+    this.listaLoginEl.onclick = (ev) => {
+      const btn = ev.target.closest("[data-sel-op]");
+      if (!btn) return;
+      const id = btn.dataset.selOp;
+      const escolhido = opcoes.find((item) => item.id === id);
+      if (!escolhido) return;
+
+      if (escolhido.pin) {
+        this.operadorPendentePin = escolhido;
+        if (this.erroPinEl) this.erroPinEl.textContent = "";
+        if (this.inputPinEl) {
+          this.inputPinEl.value = "";
+          this.inputPinEl.focus();
+        }
+        if (this.areaPinEl) this.areaPinEl.classList.remove("hidden");
+      } else {
+        this._definirOperadorAtivo(escolhido);
+      }
+    };
+
+    this.modalEl.classList.remove("hidden");
   }
 
-  fecharModalSelecaoOperador() {
-    const modal = document.getElementById("mt-modal-operadores");
-    if (modal) modal.classList.add("hidden");
+  _confirmarPin() {
+    if (!this.operadorPendentePin || !this.inputPinEl) return;
+    const digitado = this.inputPinEl.value.trim();
+    if (digitado === String(this.operadorPendentePin.pin)) {
+      const op = this.operadorPendentePin;
+      this.operadorPendentePin = null;
+      this._definirOperadorAtivo(op);
+    } else if (this.erroPinEl) {
+      this.erroPinEl.textContent = "PIN incorreto. Tente novamente.";
+    }
   }
 
-  renderizarTabelaOperadores() {
-    const container = document.getElementById("mt-tabela-operadores");
-    const selectPerfil = document.getElementById("mt-op-perfil");
-    const resumoLimite = document.getElementById("mt-resumo-limite-equipe");
+  _definirOperadorAtivo(op) {
+    this.operadorAtual = op;
+    try {
+      sessionStorage.setItem(
+        `${SESSAO_OP_KEY}_${this.empresaId}`,
+        JSON.stringify({ id: op.id, nome: op.nome, perfil: op.perfil })
+      );
+    } catch (_) {}
 
-    if (selectPerfil) {
-      selectPerfil.innerHTML = this.plano.perfisPermitidos
-        .map((perfilKey) => {
-          const info = PERFIS_INTERNOS[perfilKey];
-          return `<option value="${perfilKey}">${info ? info.label : perfilKey}</option>`;
-        })
-        .join("");
+    if (this.badgeEl) {
+      const perfilNome = PERFIS_INTERNOS[op.perfil]?.nome || op.perfil;
+      this.badgeEl.textContent = `${op.nome} (${perfilNome})`;
     }
-
-    if (resumoLimite) {
-      resumoLimite.textContent = `Plano ${this.plano.nome}: ${this.operadores.length} de ${this.plano.maxUsuariosInternos} usuário(s) cadastrado(s).`;
+    if (this.btnTrocarEl) {
+      this.btnTrocarEl.classList.remove("hidden");
     }
-
-    if (!container) return;
-
-    container.innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Login</th>
-            <th>Perfil</th>
-            <th>PIN</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${this.operadores
-            .map((op) => {
-              const ativo = op.ativo !== false;
-              const isAdminPrincipal = op.loginInterno === "admin" && op.perfil === "admin";
-              return `
-                <tr>
-                  <td><strong>${op.nome}</strong></td>
-                  <td>@${op.loginInterno}</td>
-                  <td>
-                    <select data-acao-perfil="${op.id}" ${isAdminPrincipal ? "disabled" : ""}>
-                      ${this.plano.perfisPermitidos
-                        .map(
-                          (p) =>
-                            `<option value="${p}" ${op.perfil === p ? "selected" : ""}>${
-                              PERFIS_INTERNOS[p]?.label || p
-                            }</option>`
-                        )
-                        .join("")}
-                    </select>
-                  </td>
-                  <td>${op.pinHash ? "Configurado" : "Sem PIN"}</td>
-                  <td>${ativo ? "Ativo" : "Inativo"}</td>
-                  <td>
-                    ${
-                      isAdminPrincipal
-                        ? `<small class="muted-text">Principal</small>`
-                        : `<button type="button" class="btn btn-outline btn-sm" data-acao-status="${op.id}" data-proximo-status="${!ativo}">${
-                            ativo ? "Desativar" : "Ativar"
-                          }</button>`
-                    }
-                  </td>
-                </tr>
-              `;
-            })
-            .join("")}
-        </tbody>
-      </table>
-    `;
+    if (this.modalEl) {
+      this.modalEl.classList.add("hidden");
+    }
   }
 
-  _configurarEventosUI() {
-    if (this._eventosConfigurados) return;
-    this._eventosConfigurados = true;
-
-    const btnTrocar = document.getElementById("mt-btn-trocar-operador");
-    if (btnTrocar) {
-      btnTrocar.addEventListener("click", () => this.abrirModalSelecaoOperador());
+  _lerSessaoSalva() {
+    try {
+      const raw = sessionStorage.getItem(`${SESSAO_OP_KEY}_${this.empresaId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
     }
+  }
 
-    const listaLogin = document.getElementById("mt-lista-operadores-login");
-    const areaPin = document.getElementById("mt-area-pin");
-    const inputPin = document.getElementById("mt-input-pin");
-    const erroPin = document.getElementById("mt-erro-pin");
-    const btnConfirmarPin = document.getElementById("mt-btn-confirmar-pin");
-
-    if (listaLogin) {
-      listaLogin.addEventListener("click", async (e) => {
-        const card = e.target.closest("[data-op-id]");
-        if (!card) return;
-        const opId = card.getAttribute("data-op-id");
-        const exigePin = card.getAttribute("data-exige-pin") === "true";
-        if (erroPin) erroPin.textContent = "";
-
-        if (exigePin) {
-          this._pendentePinId = opId;
-          if (areaPin) areaPin.classList.remove("hidden");
-          if (inputPin) {
-            inputPin.value = "";
-            inputPin.focus();
-          }
-          return;
-        }
-
-        try {
-          await this.autenticarOperador(opId, "");
-        } catch (err) {
-          if (erroPin) erroPin.textContent = err.message;
-        }
-      });
-    }
-
-    if (btnConfirmarPin) {
-      btnConfirmarPin.addEventListener("click", async () => {
-        if (!this._pendentePinId) return;
-        try {
-          await this.autenticarOperador(this._pendentePinId, inputPin?.value || "");
-        } catch (err) {
-          if (erroPin) erroPin.textContent = err.message;
-        }
-      });
-    }
-
-    const formNovo = document.getElementById("mt-form-novo-operador");
-    const msgEquipe = document.getElementById("mt-msg-equipe");
-
-    if (formNovo) {
-      formNovo.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        if (msgEquipe) msgEquipe.textContent = "";
-
-        const nome = document.getElementById("mt-op-nome")?.value || "";
-        const loginInterno = document.getElementById("mt-op-login")?.value || "";
-        const perfil = document.getElementById("mt-op-perfil")?.value || "atendente";
-        const pin = document.getElementById("mt-op-pin")?.value || "";
-
-        try {
-          await this.criarOperadorInterno({ nome, loginInterno, perfil, pin });
-          formNovo.reset();
-          if (msgEquipe) {
-            msgEquipe.style.color = "#15803d";
-            msgEquipe.textContent = "Usuário interno cadastrado com sucesso.";
-          }
-        } catch (err) {
-          if (msgEquipe) {
-            msgEquipe.style.color = "#dc2626";
-            msgEquipe.textContent = err.message;
-          }
-        }
-      });
-    }
-
-    const tabelaContainer = document.getElementById("mt-tabela-operadores");
-    if (tabelaContainer) {
-      tabelaContainer.addEventListener("change", async (e) => {
-        const select = e.target.closest("[data-acao-perfil]");
-        if (!select) return;
-        const opId = select.getAttribute("data-acao-perfil");
-        try {
-          await this.atualizarOperador(opId, { perfil: select.value });
-        } catch (err) {
-          alert(err.message);
-          this.renderizarTabelaOperadores();
-        }
-      });
-
-      tabelaContainer.addEventListener("click", async (e) => {
-        const btn = e.target.closest("[data-acao-status]");
-        if (!btn) return;
-        const opId = btn.getAttribute("data-acao-status");
-        const proximoStatus = btn.getAttribute("data-proximo-status") === "true";
-        try {
-          await this.atualizarOperador(opId, { ativo: proximoStatus });
-        } catch (err) {
-          alert(err.message);
-        }
-      });
-    }
+  limparSessaoOperador() {
+    this.operadorAtual = null;
+    try {
+      sessionStorage.removeItem(`${SESSAO_OP_KEY}_${this.empresaId}`);
+    } catch (_) {}
   }
 }
