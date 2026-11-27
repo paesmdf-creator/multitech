@@ -1,243 +1,138 @@
-// js/planos-permissoes.js
-// Definição dos 4 planos (Starter, Profissional, Empresarial, Premium) e dos 4 perfis internos
-
 export const PLANOS_MULTITECH = {
   starter: {
     id: "starter",
     nome: "Starter",
-    preco: 39.9,
-    precoTexto: "R$ 39,90",
-    destaque: "Essencial",
-    descricaoUsuarios: "1 usuário (Administrador)",
-    maxUsuariosInternos: 1,
-    perfisPermitidos: ["admin"],
-    permissoesCustomizaveis: false,
-    especificacoes: [
-      "Cadastro de clientes",
-      "Cadastro de serviços",
+    precoMensal: 39.9,
+    limiteOperadores: 2,
+    destaque: false,
+    badge: "Essencial",
+    perfis: ["admin", "operador"],
+    modulos: ["clientes", "servicos", "agenda", "financeiro_basico"],
+    recursos: [
+      "Até 2 usuários internos no mesmo login",
+      "Cadastro de clientes e serviços",
       "Agenda de atendimentos",
-      "Portfólio digital",
-      "Controle básico de receitas e despesas"
-    ],
-    modulos: [
-      "clientes",
-      "servicos",
-      "agenda",
-      "portfolio",
-      "financeiro_basico"
+      "Financeiro básico (entradas e saídas)"
     ]
   },
   profissional: {
     id: "profissional",
     nome: "Profissional",
-    preco: 59.9,
-    precoTexto: "R$ 59,90",
-    destaque: "Mais completo p/ autônomos",
-    descricaoUsuarios: "Até 2 usuários no mesmo login",
-    maxUsuariosInternos: 2,
-    perfisPermitidos: ["admin", "atendente"],
-    permissoesCustomizaveis: false,
-    especificacoes: [
-      "Tudo do Starter",
-      "Gestão financeira completa",
-      "Planilha mensal automatizada",
-      "Fluxo de caixa",
-      "Relatórios financeiros",
-      "Agendamento online pelos clientes",
-      "Histórico de atendimentos",
-      "Página comercial personalizada"
-    ],
+    precoMensal: 59.9,
+    limiteOperadores: 5,
+    destaque: true,
+    badge: "Mais escolhido",
+    perfis: ["admin", "gestor", "operador"],
     modulos: [
       "clientes",
       "servicos",
       "agenda",
+      "agenda_por_profissional",
       "portfolio",
       "financeiro_basico",
-      "financeiro_completo",
-      "planilha_mensal",
       "fluxo_caixa",
-      "relatorios_financeiros",
-      "agendamento_online",
-      "historico_atendimentos",
-      "pagina_comercial"
+      "relatorios_financeiros"
+    ],
+    recursos: [
+      "Até 5 usuários internos no mesmo login",
+      "Agenda por profissional e portfólio",
+      "Fluxo de caixa e relatórios financeiros",
+      "Perfis internos Admin, Gestor e Operador"
     ]
   },
   empresarial: {
     id: "empresarial",
     nome: "Empresarial",
-    preco: 89.9,
-    precoTexto: "R$ 89,90",
-    destaque: "Ideal para equipes",
-    descricaoUsuarios: "Até 6 usuários no mesmo login",
-    maxUsuariosInternos: 6,
-    perfisPermitidos: ["admin", "gerente", "profissional", "atendente"],
-    permissoesCustomizaveis: false,
-    especificacoes: [
-      "Tudo do Profissional",
-      "Cadastro de funcionários",
-      "Agenda por profissional",
-      "Relatórios de desempenho",
-      "Indicadores comerciais",
-      "Controle de produtividade"
-    ],
+    precoMensal: 89.9,
+    limiteOperadores: 12,
+    destaque: false,
+    badge: "Equipes",
+    perfis: ["admin", "gestor", "financeiro", "operador"],
     modulos: [
       "clientes",
       "servicos",
       "agenda",
+      "agenda_por_profissional",
+      "agendamento_online",
       "portfolio",
+      "pagina_comercial",
       "financeiro_basico",
-      "financeiro_completo",
-      "planilha_mensal",
       "fluxo_caixa",
       "relatorios_financeiros",
-      "agendamento_online",
-      "historico_atendimentos",
-      "pagina_comercial",
-      "cadastro_funcionarios",
-      "agenda_por_profissional",
       "relatorios_desempenho",
-      "indicadores_comerciais",
-      "controle_produtividade"
+      "gestao_usuarios"
+    ],
+    recursos: [
+      "Até 12 usuários internos no mesmo login",
+      "Página comercial e agendamento online",
+      "Relatórios de desempenho e gestão de equipe",
+      "Perfil interno Financeiro dedicado"
     ]
   },
   premium: {
     id: "premium",
     nome: "Premium",
-    preco: 129.9,
-    precoTexto: "R$ 129,90",
-    destaque: "Gestão avançada",
-    descricaoUsuarios: "Gestão ampliada de usuários",
-    maxUsuariosInternos: 99,
-    perfisPermitidos: ["admin", "gerente", "profissional", "atendente"],
-    permissoesCustomizaveis: true,
-    especificacoes: [
-      "Todos os recursos anteriores",
-      "Indicadores gerenciais avançados",
-      "Relatórios comparativos",
-      "Gestão ampliada de usuários",
-      "Recursos adicionais de administração"
-    ],
+    precoMensal: 129.9,
+    limiteOperadores: 30,
+    destaque: false,
+    badge: "Completo",
+    perfis: ["admin", "gestor", "financeiro", "operador"],
     modulos: [
       "clientes",
       "servicos",
       "agenda",
+      "agenda_por_profissional",
+      "agendamento_online",
       "portfolio",
+      "pagina_comercial",
       "financeiro_basico",
-      "financeiro_completo",
-      "planilha_mensal",
       "fluxo_caixa",
       "relatorios_financeiros",
-      "agendamento_online",
-      "historico_atendimentos",
-      "pagina_comercial",
-      "cadastro_funcionarios",
-      "agenda_por_profissional",
       "relatorios_desempenho",
-      "indicadores_comerciais",
-      "controle_produtividade",
-      "indicadores_gerenciais",
       "relatorios_comparativos",
-      "gestao_usuarios",
-      "admin_avancado"
+      "gestao_usuarios"
+    ],
+    recursos: [
+      "Até 30 usuários internos no mesmo login",
+      "Todos os módulos e relatórios comparativos",
+      "Indicadores gerenciais avançados"
     ]
   }
 };
 
 export const PERFIS_INTERNOS = {
   admin: {
-    label: "Administrador",
-    descricao: "Acesso total aos módulos do plano, usuários internos e configurações.",
-    modulosPermitidos: "*"
+    nome: "Administrador",
+    descricao: "Acesso total às configurações, equipe, planos e lançamentos da empresa."
   },
-  gerente: {
-    label: "Gerente",
-    descricao: "Gestão operacional completa, equipe e relatórios de desempenho.",
-    modulosPermitidos: [
-      "clientes",
-      "servicos",
-      "agenda",
-      "agenda_por_profissional",
-      "portfolio",
-      "financeiro_basico",
-      "financeiro_completo",
-      "planilha_mensal",
-      "fluxo_caixa",
-      "relatorios_financeiros",
-      "historico_atendimentos",
-      "relatorios_desempenho",
-      "indicadores_comerciais",
-      "controle_produtividade"
-    ]
+  gestor: {
+    nome: "Gestor",
+    descricao: "Gerencia clientes, serviços, agenda, portfólio e relatórios operacionais."
   },
-  profissional: {
-    label: "Profissional",
-    descricao: "Agenda própria, histórico de atendimentos e atualização de serviços.",
-    modulosPermitidos: [
-      "clientes",
-      "agenda",
-      "agenda_por_profissional",
-      "historico_atendimentos",
-      "portfolio"
-    ]
+  financeiro: {
+    nome: "Financeiro",
+    descricao: "Foco em lançamentos financeiros, fluxo de caixa e relatórios financeiros."
   },
-  atendente: {
-    label: "Atendente",
-    descricao: "Cadastro de clientes, agendamentos e lançamentos básicos do dia.",
-    modulosPermitidos: [
-      "clientes",
-      "servicos",
-      "agenda",
-      "agenda_por_profissional",
-      "historico_atendimentos",
-      "financeiro_basico"
-    ]
+  operador: {
+    nome: "Operador",
+    descricao: "Atendimento diário, cadastro de clientes e atualização da agenda."
   }
 };
 
 export function obterPlano(planoId) {
-  const chave = String(planoId || "starter").toLowerCase();
-  return PLANOS_MULTITECH[chave] || PLANOS_MULTITECH.starter;
+  return PLANOS_MULTITECH[planoId] || PLANOS_MULTITECH.starter;
 }
 
-export function podeAcessarModulo(planoId, operador, modulo) {
-  const plano = obterPlano(planoId);
-  if (!plano.modulos.includes(modulo)) return false;
-
-  if (!operador || operador.perfil === "admin") return true;
-
-  if (
-    plano.permissoesCustomizaveis &&
-    Array.isArray(operador.modulosExtras) &&
-    operador.modulosExtras.length > 0
-  ) {
-    return operador.modulosExtras.includes(modulo);
-  }
-
-  const perfil = PERFIS_INTERNOS[operador.perfil];
-  if (!perfil) return false;
-  if (perfil.modulosPermitidos === "*") return true;
-
-  return perfil.modulosPermitidos.includes(modulo);
+export function obterPerfisPermitidosNoPlano(planoId) {
+  return obterPlano(planoId).perfis || ["admin", "operador"];
 }
 
-export function aplicarPermissoesNaInterface(planoId, operador) {
+export function podeUsarModulo(planoId, modulo) {
+  if (!modulo) return true;
   const plano = obterPlano(planoId);
+  return Array.isArray(plano.modulos) && plano.modulos.includes(modulo);
+}
 
-  document.querySelectorAll("[data-modulo]").forEach((el) => {
-    const modulo = el.getAttribute("data-modulo");
-    const liberado = podeAcessarModulo(plano.id, operador, modulo);
-    el.classList.toggle("hidden", !liberado);
-  });
-
-  const painelEquipe = document.getElementById("mt-painel-gestao-operadores");
-  if (painelEquipe) {
-    const isAdmin = operador?.perfil === "admin";
-    const permiteMulti = plano.maxUsuariosInternos > 1;
-    painelEquipe.classList.toggle("hidden", !(isAdmin && permiteMulti));
-  }
-
-  const btnTrocar = document.getElementById("mt-btn-trocar-operador");
-  if (btnTrocar) {
-    btnTrocar.classList.toggle("hidden", !(plano.maxUsuariosInternos > 1));
-  }
+export function limiteOperadoresDoPlano(planoId) {
+  return obterPlano(planoId).limiteOperadores ?? 2;
 }
