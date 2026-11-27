@@ -96,6 +96,7 @@ let currentUser = null;
 let activeEmpresaId = DEMO_EMPRESA_ID;
 let planoAtualId = "standard";
 let deferredInstallPrompt = null;
+let divulgacaoInicializada = false;
 
 function esc(valor) {
   return String(valor ?? "")
@@ -209,6 +210,25 @@ function limparTelefoneWhatsApp(num) {
   const digits = String(num || "").replace(/\D/g, "");
   if (!digits) return "";
   return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
+function alternarAbaAuth(modo) {
+  const isLogin = modo === "login";
+  tabLoginEl?.classList.toggle("active", isLogin);
+  tabRegisterEl?.classList.toggle("active", !isLogin);
+  formLoginEl?.classList.toggle("hidden", !isLogin);
+  formRegisterEl?.classList.toggle("hidden", isLogin);
+  if (authErroEl) authErroEl.textContent = "";
+}
+
+function alternarView(viewName) {
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === viewName);
+  });
+  document.querySelectorAll(".view-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.id === `view-${viewName}`);
+  });
+  sidebarEl?.classList.remove("open");
 }
 
 function garantirSecoesDivulgacao() {
@@ -349,6 +369,9 @@ function garantirSecoesDivulgacao() {
     }
   }
 
+  if (divulgacaoInicializada) return;
+  divulgacaoInicializada = true;
+
   document.getElementById("mt-btn-salvar-port-desc")?.addEventListener("click", () => {
     const estado = carregarEstadoDivulgacao();
     estado.portfolioDescricao =
@@ -363,11 +386,7 @@ function garantirSecoesDivulgacao() {
     const resumo = document.getElementById("mt-port-item-resumo")?.value.trim() || "";
     if (!titulo || !resumo) return;
     const estado = carregarEstadoDivulgacao();
-    estado.portfolioItens.push({
-      id: `p_${Date.now()}`,
-      titulo,
-      resumo
-    });
+    estado.portfolioItens.push({ id: `p_${Date.now()}`, titulo, resumo });
     salvarEstadoDivulgacao(estado);
     e.target.reset();
     renderSecoesDivulgacao();
@@ -417,12 +436,7 @@ function garantirSecoesDivulgacao() {
     if (!titulo || !legenda) return;
 
     const estado = carregarEstadoDivulgacao();
-    estado.galeriaItens.push({
-      id: `g_${Date.now()}`,
-      titulo,
-      imagemUrl,
-      legenda
-    });
+    estado.galeriaItens.push({ id: `g_${Date.now()}`, titulo, imagemUrl, legenda });
     salvarEstadoDivulgacao(estado);
     e.target.reset();
     renderSecoesDivulgacao();
@@ -529,25 +543,6 @@ function renderSecoesDivulgacao() {
   }
 }
 
-function alternarAbaAuth(modo) {
-  const isLogin = modo === "login";
-  tabLoginEl?.classList.toggle("active", isLogin);
-  tabRegisterEl?.classList.toggle("active", !isLogin);
-  formLoginEl?.classList.toggle("hidden", !isLogin);
-  formRegisterEl?.classList.toggle("hidden", isLogin);
-  if (authErroEl) authErroEl.textContent = "";
-}
-
-function alternarView(viewName) {
-  document.querySelectorAll(".nav-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.view === viewName);
-  });
-  document.querySelectorAll(".view-panel").forEach((panel) => {
-    panel.classList.toggle("active", panel.id === `view-${viewName}`);
-  });
-  sidebarEl?.classList.remove("open");
-}
-
 function abrirPainelDireto(empresaId, nomeEmpresa, emailEmpresa, planoId) {
   activeEmpresaId = empresaId || DEMO_EMPRESA_ID;
   planoAtualId = planoId || "standard";
@@ -596,7 +591,7 @@ formLoginEl?.addEventListener("submit", async (e) => {
   const senha = document.getElementById("mt-login-senha")?.value || "";
   try {
     await signInWithEmailAndPassword(auth, email, senha);
-  } catch (err) {
+  } catch (_) {
     abrirPainelDireto(DEMO_EMPRESA_ID, "Multitech", email || "Administrador Geral", planoAtualId);
   }
 });
@@ -611,15 +606,10 @@ formRegisterEl?.addEventListener("submit", async (e) => {
     const cred = await createUserWithEmailAndPassword(auth, email, senha);
     await setDoc(
       doc(db, ROOT_COLLECTION, cred.user.uid),
-      {
-        nomeEmpresa,
-        email,
-        planoId: "standard",
-        atualizadoEm: new Date().toISOString()
-      },
+      { nomeEmpresa, email, planoId: "standard", atualizadoEm: new Date().toISOString() },
       { merge: true }
     ).catch(() => {});
-  } catch (err) {
+  } catch (_) {
     abrirPainelDireto(DEMO_EMPRESA_ID, nomeEmpresa, email, planoAtualId);
   }
 });
@@ -902,7 +892,6 @@ document.addEventListener("click", async (e) => {
   await carregarTodosDados(activeEmpresaId);
 });
 
-// Abre direto no painel de administrador geral sem travar caso não haja sessão ativa
 abrirPainelDireto(DEMO_EMPRESA_ID, "Multitech", "Administrador Geral", planoAtualId);
 
 onAuthStateChanged(auth, async (user) => {
